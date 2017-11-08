@@ -1,45 +1,29 @@
 import random
-from game import Mastermind
+from player import Player
 from solver import solve
 
 
-class RandomPlayer(object):
-
-    def __init__(self, game):
-        self.game = game
-        self.num_pegs = game.num_pegs
-        self.num_options = game.num_options
-        self.guesses = []
+class RandomPlayer(Player):
 
     def make_guess(self):
         options = range(self.num_options)
-        guess = [random.choice(options) for i in xrange(self.num_pegs)]
-        exist, match = game.guess(guess)
-        guess = (guess, exist, match)
-        self.guesses.append(guess)
-        return guess
+        return [random.choice(options) for i in xrange(self.num_pegs)]
 
-    def make_x_guesses(self, x):
-        '''makes x number of guesses'''
-        for _ in xrange(x):
-            self.make_guess()
-        return self.guesses
+class RandomPlayerSolver(Player):
 
-    def educated_guess(self):
+    def make_guess(self):
+        if len(self.attempts) >= 7:
+            return self._educated_guess()
+        else:
+            return self._random_guess()
+
+    def _random_guess(self):
+        options = range(self.num_options)
+        return [random.choice(options) for i in xrange(self.num_pegs)]
+
+    def _educated_guess(self):
         '''uses the solver with all of its guesses to try to make a better guess'''
-        guess = solve(
+        return solve(
             num_pegs=self.num_pegs, num_options=self.num_options,
-            feedbacks=self.guesses
+            feedbacks=self.attempts
         )
-        exist, match = game.guess(guess)
-        guess = (guess, exist, match)
-        self.guesses.append(guess)
-        return guess
-
-
-if __name__ == '__main__':
-    game = Mastermind()
-    print 'target:', game.target
-    player = RandomPlayer(game)
-    print 'random 7 guesses:', player.make_x_guesses(7)
-    print 'smart guess:', player.educated_guess()
