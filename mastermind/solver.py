@@ -8,7 +8,7 @@ def gen_subsets(length, num_indices=4):
 
 
 def solve(num_pegs=4, num_options=10, feedbacks=None):
-    """Solves the problem given the list of feedback"""
+    """Solves the problem given the list of feedbacks"""
     feedbacks = feedbacks or []
 
     # generate all possible combinations of indices
@@ -77,10 +77,10 @@ def solve(num_pegs=4, num_options=10, feedbacks=None):
     s.add(constraints)
     if s.check() == sat:
         model = s.model()
-        num = ''
+        nums = []
         for v in variables:
-            num += str(model[v])
-        return num
+            nums.append(int(model[v].as_long()))
+        return nums
     else:
         print 'UNSAT'
 
@@ -88,15 +88,22 @@ def solve(num_pegs=4, num_options=10, feedbacks=None):
 def test1():
     answers = ['2002', '0202', '2020']
     feedbacks = [([0, 0, 2, 2], 4, 2)]
-    assert solve(feedbacks=feedbacks) in answers
+    assert ''.join(map(str, solve(feedbacks=feedbacks))) in answers
+
 
 def test2():
     answer = '5302'
     feedbacks = [([0, 0, 2, 2], 2, 1), ([1, 0, 3, 7], 2, 0), ([3, 7, 1, 2], 2, 1), ([7, 3, 0, 2], 3, 3), ([5, 5, 5, 5], 1, 1)]
-    assert answer == solve(feedbacks=feedbacks, num_options=8)
+    assert answer == ''.join(map(str, solve(feedbacks=feedbacks, num_options=8)))
+
+
+def test3():
+    answer = '4005'
+    feedbacks = [([4, 5, 6, 7], 2, 1), ([4, 0, 6, 7], 2, 2), ([4, 0, 5, 8], 3, 2), ([4, 0, 9, 5], 3, 3)]
+    assert answer == ''.join(map(str, solve(feedbacks=feedbacks)))
 
 
 if __name__ == '__main__':
     test1()
     test2()
-
+    test3()
