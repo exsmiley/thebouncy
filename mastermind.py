@@ -1,35 +1,18 @@
 from z3 import Solver, Int, Bool, Or, Xor, And, If, Not, sat, is_true, is_false, unsat, unknown
+from itertools import permutations, combinations
 
 
-def gen_subsets(length, num_indices=4, index_subsets=None):
-    """Generates all subsets of indices of length length from num_indices"""
-    nums = range(num_indices)
-    if length == 1:
-        subsets = [[num] for num in range(num_indices)]
-        if index_subsets:
-            index_subsets.append(subsets)
-        return subsets
-    smaller_subsets = gen_subsets(length-1, num_indices=num_indices, index_subsets=index_subsets)
-    subsets = []
-    for num in nums:
-        for subset in smaller_subsets:
-            s2 = set(subset)
-            s2.add(num)
-            if len(s2) == length and s2 not in subsets:
-                subsets.append(s2)
-    subsets = [list(s) for s in subsets]
-    if index_subsets:
-        index_subsets.append(subsets)
-    return subsets
+def gen_subsets(length, num_indices=4):
+    S = range(num_indices)
+    return list(combinations(S, length))
 
 
 def solve(num_pegs=4, num_options=10, feedbacks=None):
     """Solves the problem given the list of feedback"""
     feedbacks = feedbacks or []
 
-    # generate all possible permutations of subsets
-    index_subsets =[[]]
-    gen_subsets(num_pegs, index_subsets=index_subsets)
+    # generate all possible combinations of indices
+    index_subsets = [gen_subsets(i, num_indices=num_pegs) for i in xrange(num_pegs+1)]
 
     variables = []
     constraints = []
@@ -47,27 +30,24 @@ def solve(num_pegs=4, num_options=10, feedbacks=None):
                     constraints.append(v != num)
         else:
             # existence groups
-            ors = []
-            for val in set(query):
-                count = 0
-                for v2 in query:
-                    if val == v2:
-                        count += 1
+            groups = list(permutations(query))
+            subsets = list(combinations(range(num_pegs), num_exist))
 
-                groups = index_subsets[count]
-                var_groups = []
-                for group in groups:
-                    var_group = [
-                        variables[i] == val
-                        for i in group
-                    ]
-                    var_groups.append(var_group)
+            var_groups = set()
 
-                xors = And(var_groups[0])
-                for v in var_groups[1:]:
-                    xors = Xor(xors, And(v))
-                ors.append(xors)
-            constraints.append(Or(ors))
+            for g in groups:
+                for s in subsets:
+                    s = set(s)
+                    var_group = tuple([
+                        variables[i] == g[i] if i in s
+                        else variables[i] != g[i]
+                        for i in xrange(num_pegs)
+                    ])
+                    var_groups.add(var_group)
+            
+            var_groups = map(And, var_groups)
+
+            constraints.append(Or(var_groups))
     
         # Constraints on positions of groups
         if num_match > 0:
@@ -106,17 +86,17 @@ def solve(num_pegs=4, num_options=10, feedbacks=None):
 
 
 def test1():
-    answer = '1316'
-    feedbacks = [([1, 3, 2, 4], 2, 2), ([1, 3, 1, 5], 3, 3)]
-    assert answer == solve(feedbacks=feedbacks)
+    answers = ['2002', '0202', '2020']
+    feedbacks = [([0, 0, 2, 2], 4, 2)]
+    assert solve(feedbacks=feedbacks) in answers
 
 def test2():
     answer = '5302'
-    feedbacks = [([0, 0, 2, 2], 4, 0)]#, ([1, 0, 3, 7], 2, 0), ([3, 7, 1, 2], 2, 1), ([7, 3, 0, 2], 3, 3), ([5, 3, 0, 2], 4, 4)]
-    print solve(feedbacks=feedbacks, num_options=8)
+    feedbacks = [([0, 0, 2, 2], 2, 1), ([1, 0, 3, 7], 2, 0), ([3, 7, 1, 2], 2, 1), ([7, 3, 0, 2], 3, 3), ([5, 5, 5, 5], 1, 1)]
+    assert answer == solve(feedbacks=feedbacks, num_options=8)
 
 
 if __name__ == '__main__':
+    test1()
     test2()
-
 
