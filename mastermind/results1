@@ -1,0 +1,16 @@
+num_pegs=4
+num_options=10
+
+Game 0: [1, 4, 3, 8]
+RandomPlayer lost in 0.000257968902588s after 15 moves
+RandomPlayerSolver won in 0.6668009758s with 8 moves
+FiveGuessPlayer won in 2452.20217705s with 6 moves
+
+Game 1: [5, 4, 1, 3]
+RandomPlayer lost in 0.000257015228271s after 15 moves
+RandomPlayerSolver won in 0.489408969879s with 8 moves
+FiveGuessPlayer won in 2152.44335389s with 7 moves
+
+Game 2: [7, 7, 9, 5]
+RandomPlayer lost in 0.000243902206421s after 15 moves
+RandomPlayerSolver won in 0.567233085632s with 8 moves

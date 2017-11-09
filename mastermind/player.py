@@ -2,6 +2,7 @@ class Player(object):
     
     def __init__(self, num_pegs=4, num_options=10):
         self.attempts = []
+        self.used = set()
         self.update_options(num_pegs=num_pegs, num_options=num_options)
 
     def update_options(self, num_pegs=4, num_options=10):
@@ -13,12 +14,14 @@ class Player(object):
         pass
 
     def add_feedback(self, guess, feedback):
+        self.used.add(tuple(guess))
         exist, match = feedback
         attempt = (guess, exist, match)
         self.attempts.append(attempt)
 
     def reset(self):
         self.attempts = []
+        self.used = set()
 
 
 class PlayerRunner(object):
@@ -27,7 +30,7 @@ class PlayerRunner(object):
         self.player = player
         self.player_type = player.__class__.__name__
 
-    def play(self, game, loss_threshold=10):
+    def play(self, game, loss_threshold=15):
         '''plays the game until the end or 10 moves are made'''
         self.player.reset()
         won_game = False
