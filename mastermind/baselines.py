@@ -12,13 +12,18 @@ class FiveGuessPlayer(Player):
 
     def _setup(self):
         # construct all possible answers
-        self.all_possible = []
-        # hard code in the 4 pegs, TODO in future make more general
-        for i1 in xrange(self.num_options):
-            for i2 in xrange(self.num_options):
-                for i3 in xrange(self.num_options):
-                    for i4 in xrange(self.num_options):
-                        self.all_possible.append([i1, i2, i3, i4])
+        all_possible = []
+        i = 0
+        while i < self.num_pegs:
+            temp = []
+            for opt in xrange(self.num_options):
+                if len(all_possible) == 0:
+                    temp.append([opt])
+                for pos in all_possible:
+                    temp.append(pos + [opt])
+            all_possible = temp
+            i += 1
+        self.all_possible = all_possible
         self.remaining_answers = self.all_possible
 
     def make_guess(self):
@@ -75,13 +80,18 @@ class Swaszek(Player):
 
     def _setup(self):
         # construct all possible answers
-        self.all_possible = []
-        # hard code in the 4 pegs, TODO in future make more general
-        for i1 in xrange(self.num_options):
-            for i2 in xrange(self.num_options):
-                for i3 in xrange(self.num_options):
-                    for i4 in xrange(self.num_options):
-                        self.all_possible.append([i1, i2, i3, i4])
+        all_possible = []
+        i = 0
+        while i < self.num_pegs:
+            temp = []
+            for opt in xrange(self.num_options):
+                if len(all_possible) == 0:
+                    temp.append([opt])
+                for pos in all_possible:
+                    temp.append(pos + [opt])
+            all_possible = temp
+            i += 1
+        self.all_possible = all_possible
         self.remaining_answers = self.all_possible
 
     def make_guess(self):
@@ -89,13 +99,14 @@ class Swaszek(Player):
 
     def add_feedback(self, guess, feedback):
         super(Swaszek, self).add_feedback(guess, feedback)
-        
+
         # only keep answers that give the same feedback
         still_remaining = []
         for target in self.remaining_answers:
             if validate_attempt(target, guess) == feedback:
                 still_remaining.append(target)
         self.remaining_answers = still_remaining
+        print 'made {} guesses with {}/{} remaining'.format(len(self.attempts), len(self.remaining_answers), len(self.all_possible))
 
     def reset(self):
         super(Swaszek, self).reset()
