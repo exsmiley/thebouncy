@@ -37,6 +37,7 @@ class PlayerRunner(object):
         while not won_game:
             guess = self.player.make_guess()
             feedback = game.guess(guess)
+            print guess, feedback
             self.player.add_feedback(guess, feedback)
             if feedback[1] == game.num_pegs:
                 won_game = True

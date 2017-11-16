@@ -4,8 +4,8 @@ from random_player import *
 from baselines import *
 from game import Mastermind
 
-num_pegs=20
-num_options=2
+num_pegs=4
+num_options=6
 
 
 def play_games(players, num_games=5, num_options=6, num_pegs=4):
@@ -44,6 +44,8 @@ def play_games(players, num_games=5, num_options=6, num_pegs=4):
         print 'avg time per game: {}s'.format(total_time_taken/num_games)
         print
 
-players = [Swaszek(num_pegs=num_pegs, num_options=num_options)]
-# players = [RandomPlayer(num_pegs=num_pegs, num_options=num_options), RandomPlayerSolver(num_pegs=num_pegs, num_options=num_options), Swaszek(num_pegs=num_pegs, num_options=num_options)]
-play_games(players, num_games=10, num_options=num_options, num_pegs=num_pegs)
+
+if __name__ == '__main__':
+    players = [Swaszek(num_pegs=num_pegs, num_options=num_options)]
+    # players = [RandomPlayer(num_pegs=num_pegs, num_options=num_options), RandomPlayerSolver(num_pegs=num_pegs, num_options=num_options), Swaszek(num_pegs=num_pegs, num_options=num_options)]
+    play_games(players, num_games=1, num_options=num_options, num_pegs=num_pegs)

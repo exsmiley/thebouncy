@@ -95,6 +95,7 @@ class Swaszek(Player):
         self.remaining_answers = self.all_possible
 
     def make_guess(self):
+        print self.remaining_answers
         return random.choice(self.remaining_answers)
 
     def add_feedback(self, guess, feedback):
@@ -102,6 +103,7 @@ class Swaszek(Player):
 
         # only keep answers that give the same feedback
         still_remaining = []
+        print [4, 0, 7, 5] in self.remaining_answers
         for target in self.remaining_answers:
             if validate_attempt(target, guess) == feedback:
                 still_remaining.append(target)
@@ -111,3 +113,12 @@ class Swaszek(Player):
     def reset(self):
         super(Swaszek, self).reset()
         self._setup()
+
+if __name__ == '__main__':
+    s = Swaszek(num_options=10)
+    feedbacks = [([4, 5, 6, 7], 2, 1), ([4, 0, 6, 7], 2, 2), ([4, 0, 5, 8], 3, 2), ([4, 0, 7, 5], 3, 3)]
+    for f in feedbacks:
+        s.add_feedback(f[0], (f[1], f[2]))
+    print s.make_guess()
+    print s.make_guess()
+
