@@ -14,13 +14,14 @@ class RandomPlayer(Player):
             return guess
 
 
-class RandomPlayerSolver(Player):
+class SolverPlayer(Player):
 
     def make_guess(self):
-        if len(self.attempts) >= 7:
+        if len(self.attempts) >= 1:
             return self._educated_guess()
         else:
-            return self._random_guess()
+            first_half = self.num_pegs/2 if self.num_pegs % 2 == 0 else self.num_pegs/2+1
+            return [1 for i in xrange(first_half)] + [2 for i in xrange(self.num_pegs/2)] #self._random_guess()
 
     def _random_guess(self):
         options = range(self.num_options)

@@ -1,4 +1,10 @@
+import itertools
 import random
+
+
+def generate_all_targets(num_pegs, num_options):
+    '''returns iterator over all targets'''
+    return itertools.product(range(num_options), repeat=num_pegs)
 
 
 def random_numbers(num_pegs=4, num_options=10):
