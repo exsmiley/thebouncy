@@ -1,5 +1,3 @@
-'''Reinforcement Learning approach adapted from Lu, et. all
-Paper: http://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=7926576'''
 import random
 import time
 from collections import defaultdict
@@ -8,7 +6,7 @@ from game import *
 from rl import *
 
 
-class LuStateManager(object):
+class StateStateManager(object):
 
     def __init__(self, learning_rate=0.1, discount=0.9):
         self.q = defaultdict(int)
@@ -16,20 +14,19 @@ class LuStateManager(object):
         self.discount = discount
 
     def get_starting_state(self):
-        return [1 for i in xrange(NUM_OPTIONS**NUM_PEGS)]
+        return []
 
     def get_action(self, state, epsilon=0.1):
         best_actions = []
         best_q_val = -100000000000000000000
-        for i, val in enumerate(state):
-            if val == 1:
-                action = i
-                q_val = self.get_q(state, action)
-                if q_val > best_q_val:
-                    best_q_val = q_val
-                    best_actions = [action]
-                elif q_val == best_q_val:
-                    best_actions.append(action)
+        for i, val in enumerate(all_guesses):
+            action = i
+            q_val = self.get_q(state, action)
+            if q_val > best_q_val:
+                best_q_val = q_val
+                best_actions = [action]
+            elif q_val == best_q_val:
+                best_actions.append(action)
 
         # randomly choose action at random to explore
         if random.random() < epsilon:
@@ -54,28 +51,20 @@ class LuStateManager(object):
 
     def update_state(self, state, action, result):
         state = copy(state)
-        guess = get_guess(action)
-        for i, val in enumerate(state):
-            if val == 1 and validate_attempt(guess, get_guess(i)) != result:
-                state[i] = 0
+        state.append((action, result))
+        state = sorted(state)
         return state
 
     def learn(self, actions):
         next_q = 0
         for (state, action, result) in actions[::-1]:
-            if result == (4, 4):
+            if result == (NUM_PEGS, NUM_PEGS):
                 next_q = self.update_q(state, action, 0, next_q)
             else:
                 next_q = self.update_q(state, action, -1, next_q)
 
-'''
-Results (after 2000 epochs):
-3 pegs, 6 options: 4.12962962963
-4 pegs, 6 options: '''
 
 
 if __name__ == '__main__':
-    state_manager = LuStateManager()
-    ml = MastermindRL(state_manager, num_epochs=2500, log_name='small/lu{}')
-    ml.train()
-    ml.test()
+    state_manager = StateStateManager()
+    MastermindRL(state_manager, num_epochs=5, log_name='results/state{}').train()

@@ -1,4 +1,6 @@
+import math
 import random
+from copy import copy
 from player import Player
 from game import validate_attempt, generate_all_targets
 
@@ -7,30 +9,18 @@ class FiveGuessPlayer(Player):
     '''uses the Knuth 5 Guess algorithm (https://en.wikipedia.org/wiki/Mastermind_(board_game))
     => just minimax so never terminates for big problems...'''
 
-    def __init__(self, num_pegs=4, num_options=10):
+    def __init__(self, num_pegs=4, num_options=6):
         super(FiveGuessPlayer, self).__init__(num_pegs=num_pegs, num_options=num_options)
         self._setup()
 
     def _setup(self):
-        # construct all possible answers
-        all_possible = []
-        i = 0
-        while i < self.num_pegs:
-            temp = []
-            for opt in xrange(self.num_options):
-                if len(all_possible) == 0:
-                    temp.append([opt])
-                for pos in all_possible:
-                    temp.append(pos + [opt])
-            all_possible = temp
-            i += 1
-        self.all_possible = all_possible
-        self.remaining_answers = self.all_possible
+        self.all_possible = list(generate_all_targets(self.num_pegs, self.num_options))
+        self.remaining_answers = copy(self.all_possible)
 
     def make_guess(self):
-        if len(self.attempts) == 0:
-            return [1, 1, 2, 2]
-        elif len(self.remaining_answers) == 1:
+        if len(self.attempts) == 0 and self.num_pegs % 2 == 0:
+            return [0 for i in xrange(int(math.floor(self.num_pegs/2.)))] + [1 for i in xrange(int(math.ceil(self.num_pegs/2.)))]
+        if len(self.remaining_answers) == 1:
             return self.remaining_answers[0]
         else:
             return self.run_minimax()
@@ -80,18 +70,6 @@ class SwaszekPlayer(Player):
         self._setup()
 
     def _setup(self):
-        # construct all possible answers
-        # all_possible = []
-        # i = 0
-        # while i < self.num_pegs:
-        #     temp = []
-        #     for opt in xrange(self.num_options):
-        #         if len(all_possible) == 0:
-        #             temp.append([opt])
-        #         for pos in all_possible:
-        #             temp.append(pos + [opt])
-        #     all_possible = temp
-        #     i += 1
         self.all_possible = list(generate_all_targets(self.num_pegs, self.num_options))#all_possible
         self.remaining_answers = self.all_possible
 
@@ -112,3 +90,7 @@ class SwaszekPlayer(Player):
     def reset(self):
         super(SwaszekPlayer, self).reset()
         self._setup()
+
+if __name__ == '__main__':
+    p = FiveGuessPlayer(num_pegs=4, num_options=3)
+    print p.make_guess()

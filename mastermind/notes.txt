@@ -1,0 +1,9 @@
+3, 6 game
+FiveGuessPlayer
+avg num attempts to win: 4.47685185185
+
+LuPlayer
+avg num attempts to win: 4.07407407407
+
+SwaszekPlayer
+avg num attempts to win: 4.24537037037

@@ -1,4 +1,5 @@
 import time
+import tqdm
 from player import PlayerRunner
 from random_player import *
 from baselines import *
@@ -6,8 +7,8 @@ from game import Mastermind, generate_all_targets
 import sys
 
 
-num_pegs=4
-num_options=30
+# num_pegs=4
+# num_options=30
 
 
 def play_games(players, num_games=5, num_options=6, num_pegs=4, do_all=False):
@@ -21,7 +22,7 @@ def play_games(players, num_games=5, num_options=6, num_pegs=4, do_all=False):
         num_games = num_options ** num_pegs
         possible_games = generate_all_targets(num_pegs, num_options)
 
-    for i in xrange(num_games):
+    for i in tqdm.tqdm(xrange(num_games)):
         if do_all:
             target = list(possible_games.next())
             game = Mastermind(num_pegs=num_pegs, num_options=num_options, target=target)
@@ -60,6 +61,9 @@ def play_games(players, num_games=5, num_options=6, num_pegs=4, do_all=False):
 
 
 if __name__ == '__main__':
-    players = [SolverPlayer(num_pegs=num_pegs, num_options=num_options), SwaszekPlayer(num_pegs=num_pegs, num_options=num_options)]
-    play_games(players, num_options=num_options, num_pegs=num_pegs, do_all=False, num_games=1000)
+    num_pegs = 3
+    num_options = 6
+    play_games([FiveGuessPlayer(num_pegs=num_pegs, num_options=num_options)], num_pegs=num_pegs, num_options=num_options, do_all=True)
+    # players = [SolverPlayer(num_pegs=num_pegs, num_options=num_options), SwaszekPlayer(num_pegs=num_pegs, num_options=num_options)]
+    # play_games(players, num_options=num_options, num_pegs=num_pegs, do_all=False, num_games=1000)
 
