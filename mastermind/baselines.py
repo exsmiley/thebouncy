@@ -103,37 +103,77 @@ class SwaszekPlayer(Player):
         self._setup()
 
 
-class EntropyPlayer(FiveGuessPlayer):
-    '''uses the Max Entropy strategy
-    TODO: It's broken....'''
+class MaxEntropyPlayer(FiveGuessPlayer):
+    '''uses the Max Entropy strategy'''
+
+    def make_guess(self):
+        if len(self.attempts) == 0 and self.num_pegs < self.num_options:
+            return [i for i in xrange(self.num_pegs)]
+        if len(self.remaining_answers) == 1:
+            return self.remaining_answers[0]
+        else:
+            return self.strategy()
 
     def strategy(self):
         possible_scores = [(i,j) for i in xrange(self.num_pegs) for j in xrange(self.num_pegs) if i >= j]
-        best_entropy = 0
+        max_entropy = 0
         best_guesses = []
         remaining = set(self.remaining_answers)
         for i, guess in enumerate(self.all_possible):
-            eliminated_counts = []
+            entropy = 0
             for score in possible_scores:
-                eliminated_count = 0
+                part_size = 0
                 for answer in self.remaining_answers:
-                    prob = validate_attempt(guess, answer) != score:
-                        eliminated_count += 1
-                eliminated_counts.append(eliminated_count)
+                    if validate_attempt(guess, answer) != score:
+                        part_size += 1
+                
+                if part_size > 0:
+                    I = math.log(1.0*len(self.remaining_answers)/part_size)/math.log(2)
+                    p = 1.0*part_size/len(self.remaining_answers)
+                    entropy += I*p
 
-            total_entropy = 0
-            probs = map(lambda x: 1.0*x/len(self.remaining_answers), eliminated_counts)
-            for prob in probs:
-                if prob > 0:
-                    total_entropy += -1*prob*math.log(prob, 2)
 
-            # if i % (len(self.all_possible)/10) == 0:
-            #     print '{}/{}'.format(i, len(self.all_possible)), best_guess, best_count
-
-            if total_entropy > best_entropy and tuple(guess) not in self.used:
-                best_count = eliminated_count
+            if entropy > max_entropy and tuple(guess) not in self.used:
+                max_entropy = entropy
                 best_guesses = [guess]
-            elif total_entropy == best_entropy and tuple(guess) not in self.used:
+            elif entropy == max_entropy and tuple(guess) not in self.used:
+                best_guesses.append(guess)
+
+        # prioritize guesses that are in the remaining answers
+        potential_win_guesses = [guess for guess in best_guesses if guess in remaining]
+
+        if len(potential_win_guesses) > 0:
+            return random.choice(potential_win_guesses)
+        else:
+            return random.choice(best_guesses)
+
+
+class MaxPartsPlayer(FiveGuessPlayer):
+    '''uses the Max Parts strategy'''
+    def make_guess(self):
+        if len(self.attempts) == 0 and self.num_pegs < self.num_options:
+            return [i for i in xrange(self.num_pegs)]
+        if len(self.remaining_answers) == 1:
+            return self.remaining_answers[0]
+        else:
+            return self.strategy()
+
+    def strategy(self):
+        possible_scores = [(i,j) for i in xrange(self.num_pegs) for j in xrange(self.num_pegs) if i >= j]
+        max_parts = 0
+        best_guesses = []
+        remaining = set(self.remaining_answers)
+        for i, guess in enumerate(self.all_possible):
+            part_size = 0
+            for score in possible_scores:
+                for answer in self.remaining_answers:
+                    if validate_attempt(guess, answer) != score:
+                        part_size += 1
+
+            if part_size > max_parts and tuple(guess) not in self.used:
+                max_parts = part_size
+                best_guesses = [guess]
+            elif part_size == max_parts and tuple(guess) not in self.used:
                 best_guesses.append(guess)
 
         # prioritize guesses that are in the remaining answers

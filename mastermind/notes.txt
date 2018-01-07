@@ -1,7 +1,15 @@
 3, 6 game
 FiveGuessPlayer (0s prep time)
 avg num attempts to win: 4.0
-avg time: 2.5 seconds
+avg time: 2.5s
+
+MaxEntropyPlayer (0s prep time)
+avg num attempts to win: 4.36574074074
+avg time per game: 2.66176124745s
+
+MaxPartsPlayer (0s prep time)
+avg num attempts to win: 4.13425925926
+avg time per game: 2.49146505087s
 
 LuPlayer
 avg num attempts to win: 4.07407407407
@@ -13,6 +21,14 @@ avg num attempts to win: 4.24537037037
 FiveGuessPlayer (0s prep time)
 avg num attempts to win: 4.462962962964999
 avg time: 45s?
+
+MaxEntropyPlayer (0s prep time)
+avg num attempts to win: TODO
+avg time per game: TODO
+
+MaxPartsPlayer (0s prep time)
+avg num attempts to win: TODO
+avg time per game: TODO
 
 SwaszekPlayer (0s prep time)
 avg num attempts to win: 4.65084876544
