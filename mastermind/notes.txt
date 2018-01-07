@@ -1,5 +1,5 @@
 3, 6 game
-FiveGuessPlayer (2 min prep time)
+FiveGuessPlayer (0s prep time)
 avg num attempts to win: 4.0
 avg time: 2.5 seconds
 
@@ -10,5 +10,11 @@ SwaszekPlayer
 avg num attempts to win: 4.24537037037
 
 4, 6 game
-FiveGuessPlayer
+FiveGuessPlayer (0s prep time)
 avg num attempts to win: 4.462962962964999
+avg time: 45s?
+
+SwaszekPlayer (0s prep time)
+avg num attempts to win: 4.65084876544
+avg time: 0.014912755861
+

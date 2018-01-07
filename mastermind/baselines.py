@@ -23,7 +23,7 @@ class FiveGuessPlayer(Player):
         if len(self.remaining_answers) == 1:
             return self.remaining_answers[0]
         else:
-            return self.run_minimax()
+            return self.strategy()
 
     def add_feedback(self, guess, feedback):
         super(FiveGuessPlayer, self).add_feedback(guess, feedback)
@@ -35,7 +35,8 @@ class FiveGuessPlayer(Player):
                 still_remaining.append(target)
         self.remaining_answers = still_remaining
 
-    def run_minimax(self):
+    def strategy(self):
+        '''runs minimax'''
         possible_scores = [(i,j) for i in xrange(self.num_pegs) for j in xrange(self.num_pegs) if i >= j]
         best_count = -1
         best_guesses = []
@@ -59,7 +60,7 @@ class FiveGuessPlayer(Player):
             elif eliminated_count == best_count and tuple(guess) not in self.used:
                 best_guesses.append(guess)
 
-        # TODO prioritize guesses that are in the remaining answers
+        # prioritize guesses that are in the remaining answers
         potential_win_guesses = [guess for guess in best_guesses if guess in remaining]
 
         if len(potential_win_guesses) > 0:
@@ -100,6 +101,50 @@ class SwaszekPlayer(Player):
     def reset(self):
         super(SwaszekPlayer, self).reset()
         self._setup()
+
+
+class EntropyPlayer(FiveGuessPlayer):
+    '''uses the Max Entropy strategy
+    TODO: It's broken....'''
+
+    def strategy(self):
+        possible_scores = [(i,j) for i in xrange(self.num_pegs) for j in xrange(self.num_pegs) if i >= j]
+        best_entropy = 0
+        best_guesses = []
+        remaining = set(self.remaining_answers)
+        for i, guess in enumerate(self.all_possible):
+            eliminated_counts = []
+            for score in possible_scores:
+                eliminated_count = 0
+                for answer in self.remaining_answers:
+                    prob = validate_attempt(guess, answer) != score:
+                        eliminated_count += 1
+                eliminated_counts.append(eliminated_count)
+
+            total_entropy = 0
+            probs = map(lambda x: 1.0*x/len(self.remaining_answers), eliminated_counts)
+            for prob in probs:
+                if prob > 0:
+                    total_entropy += -1*prob*math.log(prob, 2)
+
+            # if i % (len(self.all_possible)/10) == 0:
+            #     print '{}/{}'.format(i, len(self.all_possible)), best_guess, best_count
+
+            if total_entropy > best_entropy and tuple(guess) not in self.used:
+                best_count = eliminated_count
+                best_guesses = [guess]
+            elif total_entropy == best_entropy and tuple(guess) not in self.used:
+                best_guesses.append(guess)
+
+        # prioritize guesses that are in the remaining answers
+        potential_win_guesses = [guess for guess in best_guesses if guess in remaining]
+
+        if len(potential_win_guesses) > 0:
+            return random.choice(potential_win_guesses)
+        else:
+            return random.choice(best_guesses)
+
+
 
 if __name__ == '__main__':
     p = FiveGuessPlayer(num_pegs=4, num_options=3)
