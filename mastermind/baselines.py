@@ -38,7 +38,8 @@ class FiveGuessPlayer(Player):
     def run_minimax(self):
         possible_scores = [(i,j) for i in xrange(self.num_pegs) for j in xrange(self.num_pegs) if i >= j]
         best_count = -1
-        best_guess = None
+        best_guesses = []
+        remaining = set(self.remaining_answers)
         for i, guess in enumerate(self.all_possible):
             eliminated_counts = []
             for score in possible_scores:
@@ -51,11 +52,20 @@ class FiveGuessPlayer(Player):
 
             # if i % (len(self.all_possible)/10) == 0:
             #     print '{}/{}'.format(i, len(self.all_possible)), best_guess, best_count
-            
+
             if eliminated_count > best_count and tuple(guess) not in self.used:
                 best_count = eliminated_count
-                best_guess = guess
-        return best_guess
+                best_guesses = [guess]
+            elif eliminated_count == best_count and tuple(guess) not in self.used:
+                best_guesses.append(guess)
+
+        # TODO prioritize guesses that are in the remaining answers
+        potential_win_guesses = [guess for guess in best_guesses if guess in remaining]
+
+        if len(potential_win_guesses) > 0:
+            return random.choice(potential_win_guesses)
+        else:
+            return random.choice(best_guesses)
 
     def reset(self):
         super(FiveGuessPlayer, self).reset()

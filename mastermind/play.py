@@ -61,7 +61,7 @@ def play_games(players, num_games=5, num_options=6, num_pegs=4, do_all=False):
 
 
 if __name__ == '__main__':
-    num_pegs = 3
+    num_pegs = 4
     num_options = 6
     play_games([FiveGuessPlayer(num_pegs=num_pegs, num_options=num_options)], num_pegs=num_pegs, num_options=num_options, do_all=True)
     # players = [SolverPlayer(num_pegs=num_pegs, num_options=num_options), SwaszekPlayer(num_pegs=num_pegs, num_options=num_options)]
