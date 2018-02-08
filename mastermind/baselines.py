@@ -2,15 +2,15 @@ import math
 import random
 from copy import copy
 from player import Player
-from game import validate_attempt, generate_all_targets
+from mastermind import validate_attempt, generate_all_targets
 
 
 class FiveGuessPlayer(Player):
     '''uses the Knuth 5 Guess algorithm (https://en.wikipedia.org/wiki/Mastermind_(board_game))
     => just minimax so never terminates for big problems...'''
 
-    def __init__(self, num_pegs=4, num_options=6):
-        super(FiveGuessPlayer, self).__init__(num_pegs=num_pegs, num_options=num_options)
+    def __init__(self):
+        super(FiveGuessPlayer, self).__init__()
         self._setup()
 
     def _setup(self):
@@ -76,8 +76,8 @@ class FiveGuessPlayer(Player):
 class SwaszekPlayer(Player):
     '''uses Swaszek's strategy of enumeration + filtering + choose random'''
 
-    def __init__(self, num_pegs=4, num_options=10):
-        super(SwaszekPlayer, self).__init__(num_pegs=num_pegs, num_options=num_options)
+    def __init__(self):
+        super(SwaszekPlayer, self).__init__()
         self._setup()
 
     def _setup(self):
@@ -187,5 +187,5 @@ class MaxPartsPlayer(FiveGuessPlayer):
 
 
 if __name__ == '__main__':
-    p = FiveGuessPlayer(num_pegs=4, num_options=3)
+    p = FiveGuessPlayer()
     print p.make_guess()

@@ -4,7 +4,7 @@ import random
 import time
 from collections import defaultdict
 from copy import copy
-from game import *
+from mastermind import *
 from rl import *
 
 

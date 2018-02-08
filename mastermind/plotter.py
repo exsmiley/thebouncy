@@ -31,5 +31,5 @@ def get_plot(fname, plot_time=True, plot_moves=True):
     plt.show()
 
 if __name__ == '__main__':
-    get_plot('all_4_10')
+    get_plot('results/all_4_10')
 

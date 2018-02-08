@@ -1,7 +1,8 @@
 from z3 import Solver, Int, Bool, Or, Xor, And, If, Not, sat, is_true, is_false, unsat, unknown, Sum
+from mastermind import NUM_PEGS, NUM_OPTIONS
 
 
-def solve(num_pegs=4, num_options=10, feedbacks=None):
+def solve(num_pegs=NUM_PEGS, num_options=NUM_OPTIONS, feedbacks=None):
     """Solves the problem given the list of feedbacks"""
     feedbacks = feedbacks or []
 

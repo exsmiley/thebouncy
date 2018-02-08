@@ -1,9 +1,10 @@
 
 import numpy as np
 g = []
+
 i = 0
 while True:
-    fname = 'results/small3_6/lu{}'.format(i)
+    fname = 'small3_6/lu{}'.format(i)
     try:
         with open(fname) as f:
             count = 0.
@@ -14,9 +15,10 @@ while True:
                 line = line.split('[')
                 ans = ''.join(line[0].split('(')[1][:-3].split(', '))
                 guesses = set(map(lambda x: x[1:].replace(', ', ''), line[1][:-3].split('), ')))
-                if ans in guesses:
-                    total_guesses += len(guesses)
-                    total_correct += 1
+                # if ans in guesses:
+                total_guesses += len(guesses)
+                total_correct += 1
+
             g.append(total_guesses/total_correct)
     except:
         break

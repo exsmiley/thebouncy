@@ -1,5 +1,11 @@
-import itertools
 import random
+import itertools
+import numpy as np
+
+
+NUM_PEGS = 4
+NUM_OPTIONS = 6
+ENCODER_VECTOR_LENGTH = NUM_PEGS*NUM_OPTIONS + (NUM_PEGS+1)*2
 
 
 def generate_all_targets(num_pegs, num_options):
@@ -7,9 +13,44 @@ def generate_all_targets(num_pegs, num_options):
     return itertools.product(range(num_options), repeat=num_pegs)
 
 
-def random_numbers(num_pegs=4, num_options=10):
-    options = range(num_options)
-    return [random.choice(options) for i in xrange(num_pegs)]
+# TODO maybe figure out how to generate this in the function and cache it
+ALL_GUESSES = list(generate_all_targets(NUM_PEGS, NUM_OPTIONS))
+def get_guess(i):
+    '''gets the guess at index i'''
+    return ALL_GUESSES[i]
+
+def random_guess():
+    return random.choice(ALL_GUESSES)
+
+
+def guess_to_vector(guess):
+    vec = [0 for i in xrange(NUM_OPTIONS)]*NUM_PEGS
+
+    for i, option in enumerate(guess):
+        index = i*NUM_OPTIONS + option
+        vec[index] = 1
+
+    return vec
+
+
+def feedback_to_vector(feedback):
+    num_exist, num_match = feedback
+
+    vec = [0 for i in xrange(NUM_PEGS+1)]*2
+
+    vec[num_exist] = 1
+    vec[num_match+NUM_PEGS+1] = 1
+
+    return vec
+
+
+def unencoded_vector(guess, feedback):
+    return guess_to_vector(guess) + feedback_to_vector(feedback)
+
+
+def random_numbers():
+    options = range(NUM_OPTIONS)
+    return [random.choice(options) for i in xrange(NUM_PEGS)]
 
 
 def get_counts(arr):
@@ -47,14 +88,14 @@ def validate_attempt(target, attempt):
 
 class Mastermind(object):
 
-    def __init__(self, target=None, num_options=10, num_pegs=4):
+    def __init__(self, target=None):
         '''target is the goal array to match'''
         if target is None:
-            target = random_numbers(num_pegs=num_pegs, num_options=num_options)
+            target = random_numbers()
         self.target = target
-        assert len(target) == num_pegs
-        self.num_pegs = len(target)
-        self.num_options = num_options
+        assert len(target) == NUM_PEGS
+        self.num_pegs = NUM_PEGS
+        self.num_options = NUM_OPTIONS
 
     def guess(self, attempt):
         return validate_attempt(self.target, attempt)
