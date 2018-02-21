@@ -19,7 +19,7 @@ class StateStateManager(object):
     def get_action(self, state, epsilon=0.1):
         best_actions = []
         best_q_val = -100000000000000000000
-        for i, val in enumerate(all_guesses):
+        for i, val in enumerate(ALL_GUESSES):
             action = i
             q_val = self.get_q(state, action)
             if q_val > best_q_val:

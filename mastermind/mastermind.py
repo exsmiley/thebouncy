@@ -6,6 +6,7 @@ import numpy as np
 NUM_PEGS = 4
 NUM_OPTIONS = 6
 ENCODER_VECTOR_LENGTH = NUM_PEGS*NUM_OPTIONS + (NUM_PEGS+1)*2
+EMBEDDED_LENGTH = 10
 
 
 def generate_all_targets(num_pegs, num_options):
@@ -99,6 +100,9 @@ class Mastermind(object):
 
     def guess(self, attempt):
         return validate_attempt(self.target, attempt)
+
+    def is_winning_feedback(self, feedback):
+        return feedback[1] == NUM_PEGS
 
 
 if __name__ == '__main__':

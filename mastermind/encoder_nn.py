@@ -2,14 +2,14 @@ import tensorflow as tf
 import os
 import numpy as np
 import random
-from mastermind import ENCODER_VECTOR_LENGTH, Mastermind, random_guess, unencoded_vector
+from mastermind import ENCODER_VECTOR_LENGTH, EMBEDDED_LENGTH, Mastermind, random_guess, unencoded_vector
 
 
 # supress warnings...
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
 
-def generate_sample_encoder_input(num=10):
+def generate_sample_encoder_input(num=32):
     samples = []
 
     for _ in xrange(num):
@@ -35,14 +35,13 @@ class EncoderModel(object):
         self.input_layer = tf.placeholder(tf.float32, [None, ENCODER_VECTOR_LENGTH])
         self.labels = tf.placeholder(tf.float32, [None, ENCODER_VECTOR_LENGTH])
 
-        self.embedded_layer = tf.layers.dense(self.input_layer, 10, activation=tf.nn.relu)
+        self.embedded_layer = tf.layers.dense(self.input_layer, EMBEDDED_LENGTH, activation=tf.nn.relu)
 
         self.out_layer = tf.layers.dense(self.embedded_layer, ENCODER_VECTOR_LENGTH)
-
         self.loss = tf.reduce_mean(tf.squared_difference(self.labels, self.out_layer))
         
         self.optimizer = tf.train.AdamOptimizer(1e-3)
-        self.train = self.optimizer.minimize(self.loss)
+        self.min_loss = self.optimizer.minimize(self.loss)
 
         initializer = tf.global_variables_initializer()
         self.session.run(initializer)
@@ -55,7 +54,7 @@ class EncoderModel(object):
             self._learn_samples(samples, samples)
 
     def _learn_samples(self, x, y):
-        loss, train = self.session.run([self.loss, self.train], feed_dict={
+        loss, min_loss = self.session.run([self.loss, self.min_loss], feed_dict={
             self.input_layer: x,
             self.labels: y
         })
@@ -67,7 +66,7 @@ class EncoderModel(object):
         # x = np.array(x).reshape(-1, 2)
         return self.session.run([self.embedded_layer], feed_dict={
             self.input_layer: x,
-        })[0][0]
+        })[0]
 
     def load(self, name='models/encoder_model'):
         self.saver.restore(self.session, name)
@@ -79,12 +78,11 @@ class EncoderModel(object):
 
 
 if __name__ == '__main__':
-    chkpt = 'models/encoder_model'
-    model = EncoderModel(chkpt=chkpt)
+    # chkpt = 'models/encoder_model'
+    model = EncoderModel(chkpt=None)
 
     # model.learn()
     # model.save()
     print model.get_embeddings([3, 4, 5, 4], (3, 0))
-
 
 
