@@ -4,9 +4,9 @@ import numpy as np
 
 
 NUM_PEGS = 4
-NUM_OPTIONS = 6
+NUM_OPTIONS = 2
 ENCODER_VECTOR_LENGTH = NUM_PEGS*NUM_OPTIONS + (NUM_PEGS+1)*2
-EMBEDDED_LENGTH = 10
+EMBEDDED_LENGTH = 50
 
 
 def generate_all_targets(num_pegs, num_options):

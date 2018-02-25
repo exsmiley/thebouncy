@@ -81,8 +81,8 @@ if __name__ == '__main__':
     # chkpt = 'models/encoder_model'
     model = EncoderModel(chkpt=None)
 
-    # model.learn()
-    # model.save()
-    print model.get_embeddings([3, 4, 5, 4], (3, 0))
+    model.learn()
+    model.save()
+    print model.get_embeddings([0, 1, 1, 0], (1, 0))
 
 
