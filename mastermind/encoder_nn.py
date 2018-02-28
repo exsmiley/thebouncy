@@ -6,7 +6,7 @@ from mastermind import ENCODER_VECTOR_LENGTH, EMBEDDED_LENGTH, Mastermind, rando
 
 
 # supress warnings...
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
 
 
 def generate_sample_encoder_input(num=32):
@@ -74,6 +74,18 @@ class EncoderModel(object):
     def save(self, name='models/encoder_model'):
         self.saver.save(self.session, name)
         print 'Saved model to {}!'.format(name)
+
+    def create_current_state(self, action_feedback, permitted_actions=10):
+        # action_feedback is list of (action, feedback) tuples
+        state = np.zeros((1, permitted_actions*EMBEDDED_LENGTH))
+
+        action_feedback = sorted(action_feedback)
+
+        for i, (action, feedback) in enumerate(action_feedback):
+            additional_state = self.get_embeddings(action, feedback).reshape(EMBEDDED_LENGTH, )
+            state[:,(i)*EMBEDDED_LENGTH:(i+1)*EMBEDDED_LENGTH] = additional_state
+
+        return state
 
 
 
