@@ -6,7 +6,7 @@ from mastermind import ENCODER_VECTOR_LENGTH, EMBEDDED_LENGTH, Mastermind, rando
 
 
 # supress warnings...
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
 
 
 def generate_sample_encoder_input(num=32):

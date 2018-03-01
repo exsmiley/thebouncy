@@ -4,7 +4,7 @@ import numpy as np
 
 
 NUM_PEGS = 4
-NUM_OPTIONS = 2
+NUM_OPTIONS = 6
 ENCODER_VECTOR_LENGTH = NUM_PEGS*NUM_OPTIONS + (NUM_PEGS+1)*2
 EMBEDDED_LENGTH = 50
 
@@ -53,15 +53,13 @@ def random_numbers():
     options = range(NUM_OPTIONS)
     return [random.choice(options) for i in xrange(NUM_PEGS)]
 
-
 def get_counts(arr):
     '''get counts for each of the numbers'''
-    counts = {}
-    for num in set(arr):
-        counts[num] = 0
-        for num2 in arr:
-            if num == num2:
-                counts[num] += 1
+    counts = {i: 0 for i in xrange(NUM_OPTIONS)}
+
+    for num in arr:
+        counts[num] += 1
+
     return counts
 
 
@@ -72,12 +70,11 @@ def validate_attempt(target, attempt):
 
     # first compare counts to get num_exist
     target_counts = get_counts(target)
-    attempt_counts = get_counts(attempt)
 
-    for num, count in attempt_counts.iteritems():
-        if num in target_counts:
-            my_count = target_counts[num]
-            num_exist += min(count, my_count)
+    for num in attempt:
+        if target_counts[num] > 0:
+            target_counts[num] -= 1
+            num_exist += 1
 
     # compare arrays to get num_match
     for i in xrange(len(attempt)):
@@ -106,13 +103,20 @@ class Mastermind(object):
 
 
 if __name__ == '__main__':
-    game = Mastermind([4, 2, 3, 4])
-    print game.guess([4, 5, 6, 7]), (1, 1)
-    print game.guess([4, 3, 3, 1]), (2, 2)
+    # game = Mastermind([4, 2, 3, 4])
+    # print game.guess([4, 5, 6, 7]), (1, 1)
+    # print game.guess([4, 3, 3, 1]), (2, 2)
 
-    target = [2, 6, 2, 5]
-    game = Mastermind(target)
-    print game.guess(target)
+    target = [2, 4, 2, 5]
+    # game = Mastermind(target)
+    # print game.guess(target)
 
     guess = [3, 4, 1, 2]
     print validate_attempt(target, guess) == validate_attempt(guess, target)
+    import time
+    start = time.time()
+    for i in xrange(1296):
+        validate_attempt(target, guess)
+    t = time.time()-start
+    print t
+    print t*1296

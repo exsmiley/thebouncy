@@ -4,12 +4,15 @@ import numpy as np
 import random
 import time
 import tqdm
+import pickle
 from threading import Thread
 from copy import copy
-from baselines import MaxEntropyPlayer
+from baselines import MaxEntropyPlayer, SwaszekPlayer
 from encoder_nn import EncoderModel
 from mastermind import ENCODER_VECTOR_LENGTH, Mastermind, NUM_PEGS, NUM_OPTIONS, EMBEDDED_LENGTH, random_guess, guess_to_vector, ALL_GUESSES, random_guess
 
+# supress warnings...
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
 
 OPTIONS_LENGTH = NUM_PEGS*NUM_OPTIONS
 PERMITTED_ACTIONS = 10
@@ -41,8 +44,6 @@ def action_from_vector(choices_vector, previous_actions, num_tries=0):
 
     return choices
 
-# supress warnings...
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
 
 class DaggerModel(object):
 
@@ -124,6 +125,7 @@ class Environment(object):
         game = self.game_class()
         # print 'TARGET:', game.target
         teacher = MaxEntropyPlayer()
+        # teacher = SwaszekPlayer() # use for faster output
 
         num_actions = 0
         won = False
@@ -142,7 +144,6 @@ class Environment(object):
             # handle teacher
             opt_action = teacher.make_guess()
             teacher.add_feedback(action, feedback)
-            # print 'opt action:', opt_action, 'chosen action:', action, 'feedback:', feedback
 
             won = game.is_winning_feedback(feedback)
             opt_action_vec = np.array(guess_to_vector(opt_action))
@@ -153,39 +154,48 @@ class Environment(object):
 
             if len(states) > PERMITTED_ACTIONS or won:
                 break
-            # print states.shape, actions.shape, rewards.shape            
-
-
-        states = np.vstack(states)
-        actions = np.vstack(opt_actions)
-
-        # print states.shape, actions.shape, rewards.shape
 
         return states, opt_actions, won
 
 
 class DaggerRunner(object):
 
-    def __init__(self, chkpt=None, new_chkpt='models/dagger'):
+    def __init__(self, chkpt=None, new_chkpt='models/dagger', load_old=True):
         self.env = Environment()
         self.model = DaggerModel(chkpt=chkpt)
         self.new_chkpt = new_chkpt
-        self.dataset_states = None
-        self.dataset_actions = None
+        self.dataset_states = []
+        self.dataset_actions = []
+
+        # loads old data from pickle so that we can resume where we left off
+        if load_old:
+            try:
+                self.dataset_states = pickle.load( open( "pickle_data/states.p", "rb" ) )
+                self.dataset_actions = pickle.load( open( "pickle_data/actions.p", "rb" ) )
+            except:
+                pass
 
     def run(self, num_episode=1000):
         best_eval = 0.5 # start with a baseline
         for i in xrange(num_episode):
             print 'Game:', i+1
             states, actions, won = self.env.run_episode(self.model)
-            if self.dataset_states is None:
-                self.dataset_states = states
-                self.dataset_actions = actions
-            else:
-                self.dataset_states = np.vstack([self.dataset_states, states])
-                self.dataset_actions = np.vstack([self.dataset_actions, actions])
+            self.dataset_states.append(states)
+            self.dataset_actions.append(actions)
 
-            self.model.train(self.dataset_states, self.dataset_actions)
+            # TODO turn states/actions into "memory buffer" instead of full data set
+
+            # train the model with aggregated states and actions
+            states_agg = np.vstack(self.dataset_states).reshape(-1, EMBEDDED_LENGTH*PERMITTED_ACTIONS)
+            actions_agg = np.vstack(self.dataset_actions).reshape(-1, OPTIONS_LENGTH)
+
+            self.model.train(states_agg, actions_agg)
+
+            # save a checkpoint of data every once in a while in case want to break early
+            if (i+1) % 10000 == 0:
+                pickle.dump(self.dataset_states, open( "pickle_data/states.p", "wb" ) )
+                pickle.dump(self.dataset_actions, open( "pickle_data/actions.p", "wb" ) )
+                self.model.save(name=self.new_chkpt)
 
         self.model.save(name=self.new_chkpt)
 
@@ -202,11 +212,12 @@ def check(chkpt, model=None, encoder=None, show_results=False):
     num_moves = []
     num_moves_success = []
     successes = 0
-    num_trials = 100
+    num_trials = 1
     num_games = len(ALL_GUESSES)*num_trials
 
-    for trial in tqdm.tqdm(xrange(num_trials)):
-        for i, target in enumerate(ALL_GUESSES):
+    for trial in xrange(num_trials):
+        print 'Trial {}/{}...'.format(trial+1, num_trials)
+        for i, target in tqdm.tqdm(enumerate(ALL_GUESSES), total=len(ALL_GUESSES)):
             # play a random game
             game = Mastermind(target=target)
             won = False
@@ -278,17 +289,10 @@ def learn_anything():
 
     print agent.get_choice_vectors(start_state)
 
-'''
-~~~~daggerarg2~~~~
-learning rate: 1e-3
-Success Rate: 0.8125
-Avg Moves: 7.5625
-Avg Moves when win: 7.0
-'''
 
 if __name__ == '__main__':
     chkpt = 'models/dagger'
-    new_chkpt = 'models/dagger3'
+    new_chkpt = 'models/dagger_6peg'
     runner = DaggerRunner(chkpt=None, new_chkpt=new_chkpt)
     runner.run()
     check(new_chkpt, show_results=True)

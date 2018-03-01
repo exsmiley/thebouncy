@@ -60,9 +60,9 @@ if __name__ == '__main__':
 
     play_games([
             FiveGuessPlayer(),
-            MaxEntropyPlayer(),
-            MaxPartsPlayer(),
-            SwaszekPlayer()
+            # MaxEntropyPlayer(),
+            # MaxPartsPlayer(),
+            # SwaszekPlayer()
         ],
         do_all=False, num_games=1
     )

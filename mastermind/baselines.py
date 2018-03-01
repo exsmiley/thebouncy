@@ -1,6 +1,7 @@
 import math
 import random
 from copy import copy
+import tqdm
 from player import Player
 from mastermind import validate_attempt, generate_all_targets
 
@@ -23,6 +24,7 @@ class FiveGuessPlayer(Player):
         if len(self.remaining_answers) == 1:
             return self.remaining_answers[0]
         else:
+            print 'strategy', len(self.remaining_answers), len(self.all_possible)
             return self.strategy()
 
     def add_feedback(self, guess, feedback):
@@ -88,6 +90,7 @@ class SwaszekPlayer(Player):
         return random.choice(self.remaining_answers)
 
     def add_feedback(self, guess, feedback):
+        print tuple(guess) in self.remaining_answers
         super(SwaszekPlayer, self).add_feedback(guess, feedback)
 
         # only keep answers that give the same feedback
@@ -96,7 +99,7 @@ class SwaszekPlayer(Player):
             if validate_attempt(target, guess) == feedback:
                 still_remaining.append(target)
         self.remaining_answers = still_remaining
-        # print 'made {} guesses with {}/{} remaining'.format(len(self.attempts), len(self.remaining_answers), len(self.all_possible))
+        print 'made {} guesses with {}/{} remaining'.format(len(self.attempts), len(self.remaining_answers), len(self.all_possible))
 
     def reset(self):
         super(SwaszekPlayer, self).reset()
@@ -187,5 +190,10 @@ class MaxPartsPlayer(FiveGuessPlayer):
 
 
 if __name__ == '__main__':
-    p = FiveGuessPlayer()
-    print p.make_guess()
+    # p = FiveGuessPlayer()
+    # print p.make_guess()
+    p = SwaszekPlayer()
+    p.add_feedback([1,0,0,3], (1,0))
+    p.add_feedback([4,5,3,2], (2,2))
+    p.add_feedback([2,5,5,5], (1,0))
+    p.add_feedback([3,2,5,0], (2,2))
