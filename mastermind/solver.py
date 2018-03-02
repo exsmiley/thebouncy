@@ -2,48 +2,78 @@ from z3 import Solver, Int, Bool, Or, Xor, And, If, Not, sat, is_true, is_false,
 from mastermind import NUM_PEGS, NUM_OPTIONS
 
 
-def solve(num_pegs=NUM_PEGS, num_options=NUM_OPTIONS, feedbacks=None):
-    """Solves the problem given the list of feedbacks"""
-    feedbacks = feedbacks or []
+class MastermindSolver(object):
 
-    variables = []
-    constraints = []
+    def __init__(self):
+        self.reset()
 
-    for i in xrange(num_pegs):
-        v = Int('peg_%d' % i)
-        variables.append(v)
-        constraints.append(And(0 <= v, v < num_options))
+    def reset(self):
+        self.solver = Solver()
+        self.variables = []
 
-    # feedback is (query (4 nums), num_present, num_match)
-    for query, num_present, num_match in feedbacks:
+        for i in xrange(NUM_PEGS):
+            v = Int('peg_%d' % i)
+            self.variables.append(v)
+            self.solver.add(And(0 <= v, v < NUM_OPTIONS))
+
+    def add_feedback(self, action_feedback):
+        query, (num_present, num_match) = action_feedback
+
         # check present
         nums = []
-        for k in xrange(num_options):
+        for k in xrange(NUM_OPTIONS):
             ifs = []
             count_query = 0
             for i in xrange(len(query)):
-                ifs.append(If(variables[i] == k, 1, 0))
+                ifs.append(If(self.variables[i] == k, 1, 0))
                 if query[i] == k:
                     count_query += 1
             if_sum = Sum(ifs)
             nums.append(If(if_sum < count_query, if_sum, count_query))
         present_constraint = Sum(nums) == num_present
-        constraints.append(present_constraint)
+        self.solver.add(present_constraint)
 
         # check match
-        match_constraint = Sum([If(variables[i] == query[i], 1, 0) for i in xrange(num_pegs)]) == num_match
-        constraints.append(match_constraint)
+        match_constraint = Sum([If(self.variables[i] == query[i], 1, 0) for i in xrange(NUM_PEGS)]) == num_match
+        self.solver.add(match_constraint)
 
-    s = Solver()
-    s.add(constraints)
-    if s.check() == sat:
-        model = s.model()
-        nums = []
-        for v in variables:
-            nums.append(int(model[v].as_long()))
-        return nums
-    else:
-        print 'UNSAT'
+    def solve(self):
+        if self.solver.check() == sat:
+            model = self.solver.model()
+            nums = []
+            for v in self.variables:
+                nums.append(int(model[v].as_long()))
+            return nums
+        else:
+            print 'UNSAT'
+
+    def is_unique_solution():
+        soln = self.solve()
+        self.solver.push()
+
+        self.solver.add(Not(And([
+            self.variables[i] == soln[i]
+            for i in xrange(NUM_PEGS)
+        ])))
+
+        if self.solve():
+            self.solver.pop()
+            return False, None
+        else:
+            self.solver.pop()
+            return True, soln
+
+
+
+def solve(num_pegs=NUM_PEGS, num_options=NUM_OPTIONS, feedbacks=None):
+    """Solves the problem given the list of feedbacks"""
+    s = MastermindSolver()
+    feedbacks = feedbacks or []
+
+    for feedback in feedbacks:
+        s.add_feedback(feedback)
+
+    return s.solve()
 
 
 def test1():

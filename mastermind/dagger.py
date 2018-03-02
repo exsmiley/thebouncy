@@ -10,6 +10,7 @@ from copy import copy
 from baselines import MaxEntropyPlayer, SwaszekPlayer
 from encoder_nn import EncoderModel
 from mastermind import ENCODER_VECTOR_LENGTH, Mastermind, NUM_PEGS, NUM_OPTIONS, EMBEDDED_LENGTH, random_guess, guess_to_vector, ALL_GUESSES, random_guess
+from solver import MastermindSolver
 
 # supress warnings...
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
@@ -175,7 +176,7 @@ class DaggerRunner(object):
             except:
                 pass
 
-    def run(self, num_episode=1000):
+    def run(self, num_episode=10000):
         best_eval = 0.5 # start with a baseline
         for i in xrange(num_episode):
             print 'Game:', i+1
@@ -192,7 +193,7 @@ class DaggerRunner(object):
             self.model.train(states_agg, actions_agg)
 
             # save a checkpoint of data every once in a while in case want to break early
-            if (i+1) % 10000 == 0:
+            if (i+1) % 100 == 0:
                 pickle.dump(self.dataset_states, open( "pickle_data/states.p", "wb" ) )
                 pickle.dump(self.dataset_actions, open( "pickle_data/actions.p", "wb" ) )
                 self.model.save(name=self.new_chkpt)
@@ -263,7 +264,7 @@ def investigate_moves(chkpt):
 
     while not won:
         current_state = encoder.create_current_state(action_feedback)
-        print agent.get_choice_vectors(current_state)
+        print pretty_print_numpy(agent.get_choice_vectors(current_state))
         previous_actions = set([str(a) for (a, f) in action_feedback])
 
         action = agent.get_action(current_state, previous_actions)
@@ -289,13 +290,130 @@ def learn_anything():
 
     print agent.get_choice_vectors(start_state)
 
+def compare_to_random(chkpt):
+    tf.reset_default_graph()
+    encoder = EncoderModel(chkpt='models/encoder_model')
+    agent = DaggerModel(chkpt=chkpt)
+
+    num_moves = []
+    num_moves_success = []
+
+    random_num_moves = []
+    random_num_moves_success = []
+    successes = 0
+    random_successes = 0
+    num_trials = 1
+    num_games = len(ALL_GUESSES)*num_trials
+
+    for trial in xrange(num_trials):
+        print 'Trial {}/{}...'.format(trial+1, num_trials)
+        for i, target in tqdm.tqdm(enumerate(ALL_GUESSES), total=len(ALL_GUESSES)):
+            # play a random game
+            game = Mastermind(target=target)
+            won = False
+            action_feedback = []
+
+            # check NN
+            solver = MastermindSolver()
+
+            while not won:
+                current_state = encoder.create_current_state(action_feedback)
+                previous_actions = set([str(a) for (a, f) in action_feedback])
+
+                action = agent.get_action(current_state, previous_actions)
+                feedback = game.guess(action)
+                action_feedback.append((action, feedback))
+                solver.add_feedback((action, feedback))
+
+                won = game.is_winning_feedback(feedback)
+
+                solver_action = solver.solve()
+                solver_feedback = game.guess(solver_action)
+                if game.is_winning_feedback(solver_feedback):
+                    won = True
+                    action_feedback.append((solver_action, solver_feedback))
+
+                if len(action_feedback) >= PERMITTED_ACTIONS:
+                    break
+
+            num_moves.append(len(action_feedback))
+            if won:
+                successes += 1
+                num_moves_success.append(len(action_feedback))
+
+            # check random
+            random_solver = MastermindSolver()
+            random_action_feedback = []
+            won = False
+
+            while not won:
+                random_action = random_guess()
+                random_feedback = game.guess(random_action)
+                random_action_feedback.append((random_action, random_feedback))
+                random_solver.add_feedback((random_action, random_feedback))
+
+                won = game.is_winning_feedback(random_feedback)
+
+                solver_action = random_solver.solve()
+                solver_feedback = game.guess(solver_action)
+                if game.is_winning_feedback(solver_feedback):
+                    won = True
+                    random_action_feedback.append((solver_action, solver_feedback))
+
+                if len(random_action_feedback) >= PERMITTED_ACTIONS:
+                    break
+
+
+            random_num_moves.append(len(random_action_feedback))
+            if won:
+                random_successes += 1
+                random_num_moves_success.append(len(random_action_feedback))
+
+    print '~~~~NN~~~~'
+    print 'Success Rate: {}'.format(1.*successes/num_games)
+    print 'Avg Moves: {}'.format(1.*sum(num_moves)/num_games)
+    print 'Avg Moves when win: {}'.format(1.*sum(num_moves_success)/len(num_moves_success))
+
+    print '\n~~~~Random~~~~'
+    print 'Success Rate: {}'.format(1.*random_successes/num_games)
+    print 'Avg Moves: {}'.format(1.*sum(random_num_moves)/num_games)
+    print 'Avg Moves when win: {}'.format(1.*sum(random_num_moves_success)/len(random_num_moves_success))
+
+
+def pretty_print_numpy(a):
+    a = str(a)
+    a = a[1:].replace('\n', ' ')
+    lists = []
+
+    while True:
+        try:
+            paran_index = a.index('[')
+        except:
+            break
+        end_paran = a.index(']')
+        lst = map(lambda x: round(float(x), 3), a[paran_index+2:end_paran].split(','))
+        lists.append(lst)
+        a = a[end_paran+2:]
+
+    s = '['
+
+    for i in xrange(len(lists)):
+        s += '{}: {}'.format(i, lists[i])
+        if i != len(lists)-1:
+            s += ', '
+
+    s += ']'
+
+    return s
+
 
 if __name__ == '__main__':
     chkpt = 'models/dagger'
     new_chkpt = 'models/dagger_6peg'
-    runner = DaggerRunner(chkpt=None, new_chkpt=new_chkpt)
-    runner.run()
-    check(new_chkpt, show_results=True)
+    # runner = DaggerRunner(chkpt=None, new_chkpt=new_chkpt)
+    # runner.run()
+    # check(new_chkpt, show_results=True)
 
-    investigate_moves(new_chkpt)
+    compare_to_random(new_chkpt)
+
     # print guess_to_vector([0, 0, 1, 1])

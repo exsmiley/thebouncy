@@ -4,6 +4,7 @@ from copy import copy
 import tqdm
 from player import Player
 from mastermind import validate_attempt, generate_all_targets
+from solver import solve
 
 
 class FiveGuessPlayer(Player):
@@ -24,7 +25,7 @@ class FiveGuessPlayer(Player):
         if len(self.remaining_answers) == 1:
             return self.remaining_answers[0]
         else:
-            print 'strategy', len(self.remaining_answers), len(self.all_possible)
+            # print 'strategy', len(self.remaining_answers), len(self.all_possible)
             return self.strategy()
 
     def add_feedback(self, guess, feedback):
@@ -36,6 +37,8 @@ class FiveGuessPlayer(Player):
             if validate_attempt(target, guess) == feedback:
                 still_remaining.append(target)
         self.remaining_answers = still_remaining
+        print 'made {} guesses with {}/{} remaining'.format(len(self.attempts), len(self.remaining_answers), len(self.all_possible))
+
 
     def strategy(self):
         '''runs minimax'''
@@ -90,7 +93,7 @@ class SwaszekPlayer(Player):
         return random.choice(self.remaining_answers)
 
     def add_feedback(self, guess, feedback):
-        print tuple(guess) in self.remaining_answers
+        # print tuple(guess) in self.remaining_answers
         super(SwaszekPlayer, self).add_feedback(guess, feedback)
 
         # only keep answers that give the same feedback
@@ -99,7 +102,6 @@ class SwaszekPlayer(Player):
             if validate_attempt(target, guess) == feedback:
                 still_remaining.append(target)
         self.remaining_answers = still_remaining
-        print 'made {} guesses with {}/{} remaining'.format(len(self.attempts), len(self.remaining_answers), len(self.all_possible))
 
     def reset(self):
         super(SwaszekPlayer, self).reset()
@@ -188,12 +190,45 @@ class MaxPartsPlayer(FiveGuessPlayer):
             return random.choice(best_guesses)
 
 
+class CEGISPlayer(Player):
+
+    def make_guess(self):
+        if len(self.attempts) >= 1:
+            return self._educated_guess()
+        else:
+            first_half = self.num_pegs/2 if self.num_pegs % 2 == 0 else self.num_pegs/2+1
+            return [1 for i in xrange(first_half)] + [2 for i in xrange(self.num_pegs/2)] #self._random_guess()
+
+    def _random_guess(self):
+        options = range(self.num_options)
+        guess = [random.choice(options) for i in xrange(self.num_pegs)]
+        if tuple(guess) in self.used:
+            return self._random_guess()
+        else:
+            return guess
+
+    def _educated_guess(self):
+        '''uses the solver with all of its guesses to try to make a better guess'''
+        attempts = [(x, (y, z)) for (x, y, z) in self.attempts]
+        return solve(
+            num_pegs=self.num_pegs, num_options=self.num_options,
+            feedbacks=attempts
+        )
+
 
 if __name__ == '__main__':
     # p = FiveGuessPlayer()
     # print p.make_guess()
-    p = SwaszekPlayer()
-    p.add_feedback([1,0,0,3], (1,0))
-    p.add_feedback([4,5,3,2], (2,2))
-    p.add_feedback([2,5,5,5], (1,0))
-    p.add_feedback([3,2,5,0], (2,2))
+    p = MaxEntropyPlayer()
+    p.add_feedback([0,1,2,3], (1,0))
+    p.add_feedback([3,4,3,2], (0,0))
+    p.add_feedback([2,5,5,5], (2,1))
+    print p.make_guess()
+    p.add_feedback([5,0,4,5], (3,1))
+    # p.add_feedback([0,1,4,0], (2,1))
+    # p.add_feedback([4,0,1,5], (2,0))
+    # p.add_feedback([2,4,1,2], (0,0))
+    # p.add_feedback([3,2,5,4], (1,0))
+    # p.add_feedback([2,0,5,5], (3,0))
+    # p.add_feedback([4,5,5,5], (2,1))
+    # p.add_feedback([5,5,5,1], (2,2))

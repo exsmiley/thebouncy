@@ -59,12 +59,13 @@ def play_games(players, num_games=5, do_all=False):
 if __name__ == '__main__':
 
     play_games([
-            FiveGuessPlayer(),
+            # FiveGuessPlayer(),
             # MaxEntropyPlayer(),
             # MaxPartsPlayer(),
             # SwaszekPlayer()
+            CEGISPlayer()
         ],
-        do_all=False, num_games=1
+        do_all=True
     )
     # players = [SolverPlayer(), SwaszekPlayer()]
     # play_games(players, do_all=False, num_games=1000)
