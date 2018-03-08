@@ -98,7 +98,7 @@ class BrainModel(object):
 
 class BrainTrainer(object):
 
-    def __init__(self, chkpt=None, buffer_size=2000):
+    def __init__(self, chkpt=None, buffer_size=5000):
         self.encoder = EncoderModel(chkpt='models/encoder_model')
 
         # experience buffer
@@ -128,7 +128,6 @@ class BrainTrainer(object):
 
         # add to buffer and update
         self.add_to_buffer(state, action_vector, feedback)
-        self.train_brain()
 
     def add_to_buffer(self, state, action_vector, feedback):
         self.buffer_state.append(state)
@@ -159,17 +158,28 @@ class BrainTrainer(object):
             else:
                 self.buffer_weights[i] += 0.1
 
-    def run(self, num_times=2000):
+            self.buffer_weights[i] = max(self.buffer_weights[i], 0.1)
+
+        # turn buffer average to 1
+        avg = 1.*sum(self.buffer_weights)/len(self.buffer_weights)
+        factor = 1./avg
+        for i in xrange(len(self.buffer_weights)):
+            self.buffer_weights[i] *= factor
+
+    def run(self, num_times=100000):
         for i in xrange(num_times):
             print 'Episode {}...'.format(i+1)
             self._run_episode()
+
+            if (i+1) % 100 == 0:
+                self.train_brain()
         self.brain.save()
 
     def test(self):
         game = Mastermind()
         print 'Target:', game.target
 
-        guesses = [random_guess() for i in xrange(random.randint(0,5))]
+        guesses = [random_guess() for i in xrange(random.randint(0,0))]
         action_feedback = [(guess, game.guess(guess)) for guess in guesses]
         state = self.encoder.create_current_state(action_feedback)
 
