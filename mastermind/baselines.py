@@ -111,6 +111,8 @@ class SwaszekPlayer(Player):
 class MaxEntropyPlayer(FiveGuessPlayer):
     '''uses the Max Entropy strategy'''
 
+    # TODO entropy might be backwards...
+
     def make_guess(self):
         if len(self.attempts) == 0 and self.num_pegs < self.num_options:
             return [i for i in xrange(self.num_pegs)]
