@@ -3,6 +3,7 @@ import tqdm
 from player import PlayerRunner
 from random_player import *
 from baselines import *
+from entropy_agent import SmartEntropyAgent
 from mastermind import Mastermind, generate_all_targets, NUM_PEGS, NUM_OPTIONS
 import sys
 
@@ -63,7 +64,7 @@ if __name__ == '__main__':
             # MaxEntropyPlayer(),
             # MaxPartsPlayer(),
             # SwaszekPlayer()
-            CEGISPlayer()
+            SmartEntropyAgent()
         ],
         do_all=True
     )

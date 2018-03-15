@@ -73,6 +73,12 @@ class BrainModel(object):
         })[0]
         return probs
 
+    def get_entropy(self, state, action):
+        probs = [
+            p*np.log2(p)
+            for p in self.get_feedback_layer(state, action)[0]
+        ]
+        return -sum(probs)
 
     def train(self, state, action, feedback):
         loss, _ = self.session.run([self.loss, self.min_loss], feed_dict={
@@ -157,8 +163,8 @@ class BrainTrainer(object):
 
             self.train_brain()
 
-            if (i+1) % 1000 == 0:
-                self.brain.save('brain{}'.format(i))
+            if (i+1) % 10000 == 0:
+                self.brain.save('models/brain{}'.format(i))
 
         self.brain.save()
 
@@ -176,13 +182,13 @@ class BrainTrainer(object):
             next_action = random_guess()
             feedback = game.guess(next_action)
             print 'Action:', next_action
-            print 'feedback:', feedback
+            print 'Feedback:', feedback
             action_feedback.append((next_action, feedback))
             action_vector = np.array(guess_to_vector(next_action)).reshape(-1, OPTIONS_LENGTH)
 
             feedback = np.array(feedback_to_vector(game.guess(next_action))).reshape(-1, FEEDBACK_LENGTH)
             print 'Proposed feedback:', pretty_print_numpy(self.brain.get_feedback_layer(state, action_vector))
-            
+            print 'Entropy:', self.brain.get_entropy(state, action_vector)
             state = self.encoder.create_current_state(action_feedback)
             print
 
