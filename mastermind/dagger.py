@@ -381,6 +381,7 @@ def compare_to_random(chkpt):
 
 
 def pretty_print_numpy(a):
+    return a
     a = str(a)
     a = a[1:].replace('\n', ' ')
     lists = []

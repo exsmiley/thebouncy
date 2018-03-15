@@ -4,9 +4,9 @@ import numpy as np
 
 
 NUM_PEGS = 4
-NUM_OPTIONS = 6
-ENCODER_VECTOR_LENGTH = NUM_PEGS*NUM_OPTIONS + (NUM_PEGS+1)*2
-EMBEDDED_LENGTH = 50
+NUM_OPTIONS = 2
+ENCODER_VECTOR_LENGTH = NUM_PEGS*NUM_OPTIONS + NUM_PEGS + NUM_PEGS*(NUM_PEGS+1)+2 # add some for the unknown bit
+EMBEDDED_LENGTH = ENCODER_VECTOR_LENGTH  #50
 
 
 def generate_all_targets(num_pegs, num_options):
@@ -25,10 +25,10 @@ def random_guess():
 
 
 def guess_to_vector(guess):
-    vec = [0 for i in xrange(NUM_OPTIONS)]*NUM_PEGS
+    vec = [0 for i in xrange(NUM_OPTIONS+1)]*NUM_PEGS
 
     for i, option in enumerate(guess):
-        index = i*NUM_OPTIONS + option
+        index = i*(NUM_OPTIONS+1) + option + 1
         vec[index] = 1
 
     return vec
@@ -37,12 +37,15 @@ def guess_to_vector(guess):
 def feedback_to_vector(feedback):
     num_exist, num_match = feedback
 
-    vec = [0 for i in xrange(NUM_PEGS+1)]*2
-
-    vec[num_exist] = 1
-    vec[num_match+NUM_PEGS+1] = 1
+    vec = [0 for i in xrange(NUM_PEGS*(NUM_PEGS+1)+2)]
+    # print feedback, num_exist+4*num_match+1, len(vec)
+    vec[num_exist+4*num_match+1] = 1
 
     return vec
+
+def feedback_index(feedback):
+    num_exist, num_match = feedback
+    return num_exist+4*num_match+1
 
 
 def unencoded_vector(guess, feedback):

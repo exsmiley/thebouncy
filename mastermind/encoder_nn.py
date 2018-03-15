@@ -25,9 +25,10 @@ class EncoderModel(object):
 
     def __init__(self, chkpt=None):
         # load from chkpt if exists
-        self.create_graph()
-        if chkpt:
-            self.load(chkpt)
+        # self.create_graph()
+        # if chkpt:
+        #     self.load(chkpt)
+        pass
 
     def create_graph(self):
         self.session = tf.Session()
@@ -63,6 +64,7 @@ class EncoderModel(object):
 
     def get_embeddings(self, guess, feedback):
         x = np.array(unencoded_vector(guess, feedback)).reshape(-1, ENCODER_VECTOR_LENGTH)
+        return x
         # x = np.array(x).reshape(-1, 2)
         return self.session.run([self.embedded_layer], feed_dict={
             self.input_layer: x,
@@ -79,12 +81,14 @@ class EncoderModel(object):
         # action_feedback is list of (action, feedback) tuples
         state = np.zeros((1, permitted_actions*EMBEDDED_LENGTH))
 
+        for i in xrange(10):
+            state[:,i*EMBEDDED_LENGTH] = 1
+
         action_feedback = sorted(action_feedback)
 
         for i, (action, feedback) in enumerate(action_feedback):
             additional_state = self.get_embeddings(action, feedback).reshape(EMBEDDED_LENGTH, )
             state[:,(i)*EMBEDDED_LENGTH:(i+1)*EMBEDDED_LENGTH] = additional_state
-
         return state
 
 

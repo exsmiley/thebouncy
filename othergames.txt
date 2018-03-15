@@ -1,1 +1,12 @@
 https://en.wikipedia.org/wiki/Black_Box_(game)
+zimbinis
+
+Super-Mastermind with eight colors in five spots
+Dynamic Mastermind - user tries to make the other player have the hardest time
+
+other:
+- rubix cube?
+
+
+app ideas:
+- slack integration that allows users to specify events to look out for and text people/ping them on slack if something happens
