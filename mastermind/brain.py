@@ -21,6 +21,12 @@ NUM_FEEDBACK = 2
 FEEDBACK_LENGTH = NUM_PEGS*(NUM_PEGS+1)+2
 
 
+# tunable params
+NUM_RUNS = 10000
+BUFFER_SIZE = 11*500
+SAMPLE_SIZE = BUFFER_SIZE/50
+
+
 class BrainModel(object):
 
     def __init__(self, chkpt=None):
@@ -77,6 +83,7 @@ class BrainModel(object):
         probs = [
             p*np.log2(p)
             for p in self.get_feedback_layer(state, action)[0]
+            if p > 1e-8
         ]
         return -sum(probs)
 
@@ -98,7 +105,7 @@ class BrainModel(object):
 
 class BrainTrainer(object):
 
-    def __init__(self, chkpt=None, buffer_size=20000):
+    def __init__(self, chkpt=None, buffer_size=BUFFER_SIZE):
         tf.reset_default_graph()
         self.encoder = EncoderModel(chkpt='models/encoder_model')
 
@@ -107,8 +114,6 @@ class BrainTrainer(object):
         self.buffer_state = []
         self.buffer_av = []
         self.buffer_feedback = []
-        # self.buffer_weights = []
-
         if chkpt is None:
             self.brain = BrainModel()
         else:
@@ -138,33 +143,41 @@ class BrainTrainer(object):
         self.buffer_state.append(state)
         self.buffer_av.append(action_vector)
         self.buffer_feedback.append(feedback)
-        # self.buffer_weights.append(weight)
-
-        # if too many in buffer, remove from front
-        if len(self.buffer_state) > self.buffer_size:
-            self.buffer_state.pop(0)
-            self.buffer_av.pop(0)
-            self.buffer_feedback.pop(0)
-            # self.buffer_weights.pop(0)
 
     def train_brain(self):
-        state = np.array(self.buffer_state).reshape(-1, EMBEDDED_LENGTH*PERMITTED_ACTIONS)
-        action_vector = np.array(self.buffer_av).reshape(-1, OPTIONS_LENGTH)
-        feedback = np.array(self.buffer_feedback).reshape(-1, FEEDBACK_LENGTH)
-        # weights = np.array(self.buffer_weights).reshape(-1, 2)
+        num_samples = min(len(self.buffer_state), SAMPLE_SIZE)
+        indices = [i for i in xrange(len(self.buffer_state))]
+        samples = random.sample(indices, num_samples)
+
+        buffer_state = [self.buffer_state[i] for i in samples]
+        buffer_av = [self.buffer_av[i] for i in samples]
+        buffer_feedback = [self.buffer_feedback[i] for i in samples]
+
+        state = np.array(buffer_state).reshape(-1, EMBEDDED_LENGTH*PERMITTED_ACTIONS)
+        action_vector = np.array(buffer_av).reshape(-1, OPTIONS_LENGTH)
+        feedback = np.array(buffer_feedback).reshape(-1, FEEDBACK_LENGTH)
 
         self.brain.train(state, action_vector, feedback)
 
+    def reset_buffer(self):
+        if len(self.buffer_state) > BUFFER_SIZE:
+            # reset buffer
+            self.buffer_state = self.buffer_state[:int(.75*len(self.buffer_state))]
+            self.buffer_av = self.buffer_av[:int(.75*len(self.buffer_av))]
+            self.buffer_feedback = self.buffer_feedback[:int(.75*len(self.buffer_feedback))]
 
-    def run(self, num_times=100000):
+    def run(self, num_times=NUM_RUNS):
         for i in xrange(num_times):
-            print 'Episode {}...'.format(i+1)
             self._run_episode()
 
-            self.train_brain()
+            # if (i+1) % 25 == 0:
+            #     print 'Episode {}...'.format(i+1)
+            #     for i in xrange(25):
+            #         self.train_brain()
 
-            if (i+1) % 10000 == 0:
-                self.brain.save('models/brain{}'.format(i))
+            #     self.reset_buffer()
+            self.train_brain()
+            self.reset_buffer()
 
         self.brain.save()
 
@@ -178,8 +191,17 @@ class BrainTrainer(object):
 
         # print 'Previous actions:', action_feedback
 
+        our_guesses = []
+
         for i in xrange(10):
             next_action = random_guess()
+
+            if random.random() < 0 and len(our_guesses) > 0:
+                print 'MAKING AN OLD GUESS'
+                next_action = random.choice(our_guesses)
+
+            our_guesses.append(next_action)
+
             feedback = game.guess(next_action)
             print 'Action:', next_action
             print 'Feedback:', feedback
@@ -226,5 +248,5 @@ def get_weight(feedback):
     # return 1/dists[feedback]
 
 if __name__ == '__main__':
-    # BrainTrainer().run()
+    BrainTrainer().run()
     BrainTrainer(chkpt='models/brain').test()

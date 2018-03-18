@@ -84,7 +84,22 @@ class EncoderModel(object):
         for i in xrange(10):
             state[:,i*EMBEDDED_LENGTH] = 1
 
-        action_feedback = sorted(action_feedback)
+        # first need to map action_feedback into universal format
+        next_num = 0
+        seen_map = {}
+        new_action_feedback = []
+
+        for (action, feedback) in action_feedback:
+            new_action = []
+            for option in action:
+                if option not in seen_map:
+                    seen_map[option] = next_num
+                    next_num += 1
+                new_action.append(seen_map[option])
+            new_action_feedback.append((new_action, feedback))
+
+        # sort to maintain similar looking sequences
+        action_feedback = sorted(new_action_feedback)
 
         for i, (action, feedback) in enumerate(action_feedback):
             additional_state = self.get_embeddings(action, feedback).reshape(EMBEDDED_LENGTH, )

@@ -7,10 +7,10 @@ from mastermind import *
 
 class SmartEntropyAgent(Player):
 
-    def __init__(self):
+    def __init__(self, chkpt=None):
         super(SmartEntropyAgent, self).__init__()
         self.encoder = EncoderModel() # don't need a checkpoint since not encoded
-        self.brain = BrainModel(chkpt='models/brain')
+        self.brain = BrainModel(chkpt=chkpt)
         self.solver = MastermindSolver()
         self.all_possible_moves = list(generate_all_targets(self.num_pegs, self.num_options))
 
@@ -27,7 +27,7 @@ class SmartEntropyAgent(Player):
         for move in self.all_possible_moves:
             action_vec = np.array(guess_to_vector(move)).reshape(-1, OPTIONS_LENGTH)
             entropy = self.brain.get_entropy(state, action_vec)
-            if entropy > top_entropy:
+            if entropy > top_entropy and move not in self.used:
                 top_move = move
                 top_entropy = entropy
 
@@ -44,6 +44,9 @@ class SmartEntropyAgent(Player):
         super(SmartEntropyAgent, self).reset()
         self.solver.reset()
 
+    def can_continue(self):
+        return len(self.attempts) < 11
+
 if __name__ == '__main__':
     from player import PlayerRunner
 
@@ -56,4 +59,5 @@ if __name__ == '__main__':
         print 'Won in {} moves!'.format(len(actions))
     else:
         print 'Lost :('
+        print actions
 

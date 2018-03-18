@@ -22,6 +22,9 @@ class Player(object):
         self.attempts = []
         self.used = set()
 
+    def can_continue(self):
+        return True
+
 
 class PlayerRunner(object):
 
@@ -33,7 +36,7 @@ class PlayerRunner(object):
         '''plays the game until the end or 30 moves are made'''
         self.player.reset()
         won_game = False
-        while not won_game:
+        while not won_game and self.player.can_continue():
             guess = self.player.make_guess()
             feedback = game.guess(guess)
             self.player.add_feedback(guess, feedback)

@@ -8,7 +8,7 @@ from mastermind import Mastermind, generate_all_targets, NUM_PEGS, NUM_OPTIONS
 import sys
 
 
-def play_games(players, num_games=5, do_all=False):
+def play_games(players, num_games=50, do_all=False):
     '''assumes no duplicate player types'''
     runners = map(PlayerRunner, players)
 
@@ -63,10 +63,11 @@ if __name__ == '__main__':
             # FiveGuessPlayer(),
             # MaxEntropyPlayer(),
             # MaxPartsPlayer(),
-            # SwaszekPlayer()
-            SmartEntropyAgent()
+            # SwaszekPlayer(),
+            SmartEntropyAgent(chkpt='models/brain'),
+            RandomSolverPlayer()
         ],
-        do_all=True
+        do_all=False
     )
     # players = [SolverPlayer(), SwaszekPlayer()]
     # play_games(players, do_all=False, num_games=1000)

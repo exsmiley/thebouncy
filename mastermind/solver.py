@@ -45,7 +45,7 @@ class MastermindSolver(object):
                 nums.append(int(model[v].as_long()))
             return nums
         else:
-            return None,'UNSAT'
+            print 'UNSAT'
 
     def is_unique_solution(self):
         soln = self.solve()
