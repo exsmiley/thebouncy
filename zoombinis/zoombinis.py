@@ -1,8 +1,8 @@
 import random
 
 
-NUM_ZOOMBINIS = 10
-MAX_TRIES = NUM_ZOOMBINIS*2
+NUM_ZOOMBINIS = 16
+MAX_MISTAKES = 6
 
 class Zoombini(object):
 
@@ -55,7 +55,7 @@ class Game(object):
             self.zoombinis = [Zoombini() for _ in xrange(NUM_ZOOMBINIS)]
 
         self.new_game(bridge)
-        self.tries = 0
+        self.mistakes = 0
 
     def new_game(self, bridge=None):
         if bridge:
@@ -64,17 +64,18 @@ class Game(object):
             self.bridge = Bridge()
 
     def send_zoombini(self, index, top):
-        self.tries += 1
         zoombini = self.zoombinis[index]
         if self.bridge.check_pass(zoombini, top):
             zoombini.has_passed = True
+        else:
+            self.mistakes += 1
 
     def has_won(self):
         num_passed = sum(map(lambda x: x.has_passed, self.zoombinis))
         return num_passed == len(self.zoombinis)
 
     def can_move(self):
-        return self.tries < MAX_TRIES
+        return self.mistakes < MAX_MISTAKES
 
 
 if __name__ == '__main__':
