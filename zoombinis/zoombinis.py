@@ -29,7 +29,7 @@ class Zoombini(object):
             self.feet = random.randint(0, 4)
 
     def get_vector(self):
-        vec = [0 for i in xrange(ZOOMBINI_VECTOR_LENGTH)]
+        vec = [0 for i in range(ZOOMBINI_VECTOR_LENGTH)]
         if self.is_top is None:
             vec[0] = 1
         else:
@@ -46,7 +46,7 @@ class Zoombini(object):
         return vec
 
     def get_candidate_vector(self):
-        vec = [0 for i in xrange(CANDIDATE_LENGTH)]
+        vec = [0 for i in range(CANDIDATE_LENGTH)]
         vec[self.hair] = 1
         vec[5+self.eyes] = 1
         vec[10+self.nose] = 1
@@ -91,7 +91,7 @@ class Game(object):
             self.zoombinis = zoombinis
         else:
             # init zoombinis randomly
-            self.zoombinis = [Zoombini() for _ in xrange(NUM_ZOOMBINIS)]
+            self.zoombinis = [Zoombini() for _ in range(NUM_ZOOMBINIS)]
 
         self.new_game(bridge)
         self.mistakes = 0
@@ -137,4 +137,4 @@ class Game(object):
 
 if __name__ == '__main__':
     g = Game()
-    print g
+    print(g)
