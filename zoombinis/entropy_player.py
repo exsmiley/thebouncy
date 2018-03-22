@@ -26,7 +26,6 @@ class EntropyPlayer(object):
 
             for i in indices_remaining:
                 state = game.get_state_vector(i)
-                # state = np.array(state).reshape(-1, INPUT_LENGTH)
 
                 entropy = self.brain.get_entropy(state)
 
@@ -50,7 +49,6 @@ class EntropyPlayer(object):
                 index = best_entropy_i
 
             state = game.get_state_vector(i)
-            # state = np.array(state).reshape(-1, INPUT_LENGTH)
             probabilities = self.brain.get_probabilities(state)
             send_top = True if np.argmax(probabilities) == 0 else False
 
@@ -61,10 +59,6 @@ class EntropyPlayer(object):
             tried[index] = send_top
 
             feedback = game.send_zoombini(index, send_top)
-            # print(state)
-            # print(best_entropy, best_entropy_i, probabilities, index, indices_remaining, best_prob, best_prob_i)
-            # print(feedback)
-            # print(best_entropy, best_entropy-1.*sum(entropies)/len(entropies), np.var(entropies))
 
             if feedback:
                 indices_remaining.remove(index)
