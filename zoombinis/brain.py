@@ -9,8 +9,9 @@ from copy import copy
 from zoombinis import *
 
 # tunable hyperparameters
-NUM_RUNS = 50000
-LEARNING_RATE = 1e-5
+NUM_RUNS = 10000
+LEARNING_RATE = 1e-3
+to_train = True
 
 # supress warnings...
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'
@@ -180,7 +181,6 @@ class ZTrainer(object):
 
 
 if __name__ == '__main__':
-    to_train = False
     if to_train:
         trainer = ZTrainer()
         trainer.run()

@@ -11,6 +11,7 @@ class EntropyPlayer(object):
 
     def play_game(self, game):
         indices_remaining = [i for i in xrange(NUM_ZOOMBINIS)]
+        tried = {} # maps indices to previously tried boolean values
 
         while game.can_move():
             best_entropy = 0
@@ -48,7 +49,16 @@ class EntropyPlayer(object):
             probabilities = self.brain.get_feedback_layer(state)[0]
             send_top = True if np.argmax(probabilities) == 0 else False
 
+            if index in tried:
+                send_top = not tried[index]
+
+            # make sure no duplicate actions
+            tried[index] = send_top
+
             feedback = game.send_zoombini(index, send_top)
+            # print state
+            # print best_entropy, probabilities, i
+            # print feedback
 
             if feedback:
                 indices_remaining.remove(index)
@@ -62,7 +72,7 @@ if __name__ == '__main__':
     player = EntropyPlayer()
 
     wins = 0
-    num_games = 1
+    num_games = 1000
     for i in tqdm.tqdm(xrange(num_games)):
         if player.play_game(Game()):
             wins += 1

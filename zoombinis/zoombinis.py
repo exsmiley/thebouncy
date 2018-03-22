@@ -111,7 +111,6 @@ class Game(object):
 
         # collected information about the zoombini
         zoombini.is_top = (zoombini.has_passed and top) or (not zoombini.has_passed and not top)
-
         return zoombini.has_passed
 
     def has_won(self):
