@@ -1,10 +1,6 @@
-import os
-import numpy as np
 import random
-import time
 import tqdm
-import pickle
-from copy import copy
+import numpy as np
 from zoombinis import *
 
 import torch
@@ -13,55 +9,62 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 
+
 # tunable hyperparameters
-NUM_RUNS = 10000
+NUM_RUNS = 100000
+SAMPLE_SIZE = 20
 LEARNING_RATE = 1e-3
 MOMENTUM = 0.99
-to_train = True
+TO_TRAIN = False
 
 
-class ZBrain(nn.Module):
+class Brain(nn.Module):
 
     def __init__(self, chkpt=None):
-        super(ZBrain, self).__init__()
+        super(Brain, self).__init__()
 
-        self.fc1 = nn.Linear(INPUT_LENGTH, 2500)
-        self.fc2 = nn.Linear(2500, FEEDBACK_LENGTH)
+        self.fc1 = nn.Linear(BRAIN_INPUT_LENGTH, 5000)
+        self.fc2 = nn.Linear(5000, OUTPUT_LENGTH)
 
         if chkpt is not None:
             self.load(chkpt)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        x = F.softmax(self.fc2(x), dim=-1)
-        return x
+        # TODO later to actually split when training before softmax
+        vecs = torch.split(self.fc2(x), NUM_BRIDGES, dim=1)
+        vecs = tuple(map(lambda v: F.softmax(v, dim=-1), vecs))
+        return vecs#torch.cat(vecs)
 
-    def get_entropy(self, state):
-        state = Variable(torch.FloatTensor(state))
+    def get_entropies(self, state):
+        probs = self.get_probabilities(state)
 
-        probs = [
-            p*np.log2(p)
-            for p in self.forward(state).data
-            if p > 1e-8
-        ]
-        return -sum(probs)
+        entropies = []
+        for prob in probs:
+            entropies.extend([
+                -p*np.log2(p)
+                if p > 1e-8
+                else 0
+                for p in prob
+            ])
+        return entropies
 
     def get_probabilities(self, state):
-        state = Variable(torch.FloatTensor(state))
-        return list(self.forward(state).data)
+        state = Variable(torch.FloatTensor(state).view(-1, BRAIN_INPUT_LENGTH))
+        return list(map(lambda x: list(x.data.numpy()[0]), self.forward(state)))
 
     def load(self, name='models/brain'):
         self.load_state_dict(torch.load(name))
+        print('Loaded model from {}!'.format(name))
 
     def save(self, name='models/brain'):
         torch.save(self.state_dict(), name)
         print('Saved model to {}!'.format(name))
 
-
-class ZBrainTrainer(object):
+class BrainTrainer(object):
 
     def __init__(self, chkpt=None):
-        self.model = ZBrain()
+        self.model = Brain(chkpt=chkpt)
         self.optimizer = optim.SGD(self.model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
         self.criterion = nn.CrossEntropyLoss()
 
@@ -82,25 +85,29 @@ class ZBrainTrainer(object):
 
     def train(self):
         all_indices = [i for i in range(len(self.state_buffer))]
-        indices = set(random.sample(all_indices, 20))
+        indices = set(random.sample(all_indices, SAMPLE_SIZE))
 
         states = [state for i, state in enumerate(self.state_buffer) if i in indices]
         feedbacks = [fb for i, fb in enumerate(self.feedback_buffer) if i in indices]
 
-        states = torch.FloatTensor(states).view(-1, INPUT_LENGTH)
-        # print(states.shape[0])
-        feedbacks = torch.LongTensor(feedbacks)
+        states = torch.FloatTensor(states).view(-1, BRAIN_INPUT_LENGTH)
+        feedbacks = torch.LongTensor(feedbacks).view(int(OUTPUT_LENGTH/NUM_BRIDGES), -1)
         
         states, feedbacks = Variable(states), Variable(feedbacks)
 
         # actually train now
         self.optimizer.zero_grad()
         output = self.model(states)
-        loss = self.criterion(output, feedbacks)
-        loss.backward()
+        losses = []
+        for i, zoombini in enumerate(output):
+            loss = self.criterion(zoombini, feedbacks[i])
+            losses.append(loss)
+
+        total_loss = sum(losses)
+        total_loss.backward()
         self.optimizer.step()
 
-        print('Loss:', loss.data[0])
+        print('Loss:', total_loss.data.numpy()[0]/len(losses))#sum(losses)/len(losses))
 
         # reset buffers
         self.state_buffer = []
@@ -119,28 +126,22 @@ class ZBrainTrainer(object):
             while index in sent_indices:
                 index = random.randint(0, NUM_ZOOMBINIS-1)
 
-            state = game.get_state_vector(index)
-
-            send_top = True if random.randint(0, 1) else False
-            feedback = game.send_zoombini(index, send_top)
-
-            if (feedback and send_top) or (not feedback and not send_top):
-                feedback_vec = 0
-            else:
-                feedback_vec = 1
-
-            if feedback:
-                sent_indices.add(index)
+            state = game.get_brain_state()
+            game.send_zoombini(index, random.randint(0, 1))
 
             states.append(state)
-            feedbacks.append(feedback_vec)
+            feedbacks.append(game.get_brain_truth())
 
         return states, feedbacks
 
     def test(self):
         game = Game()
-        print(game)
         sent_indices = set()
+        states = []
+        feedbacks = []
+
+        print('TRUTH')
+        print(game.get_brain_truth())
 
         while game.can_move():
             index = random.randint(0, NUM_ZOOMBINIS-1)
@@ -148,32 +149,19 @@ class ZBrainTrainer(object):
             while index in sent_indices:
                 index = random.randint(0, NUM_ZOOMBINIS-1)
 
-            state = game.get_state_vector(index)
-            state = np.array(state).reshape(-1, INPUT_LENGTH)
-
-            probabilities = self.model.get_feedback_layer(state)
-            entropy = self.model.get_entropy(state)
-            print('\nGoing to send index', index, game.zoombinis[index])
-            print('Probabilities: {}\nEntropy: {}'.format(probabilities, entropy))
-
-            send_top = True if random.randint(0, 1) else False
-            feedback = game.send_zoombini(index, send_top)
-            print(feedback, send_top)
-            if (feedback and send_top) or (not feedback and not send_top):
-                feedback_vec = [1, 0]
-            else:
-                feedback_vec = [0, 1]
-
-            if feedback:
-                sent_indices.add(index)
-
+            state = game.get_brain_state()
+            pred = self.model.get_probabilities(state)
+            # print('\nSTATE:', state)
+            print('\nPRED:', pred)
+            print('ENTROPIES:', self.model.get_entropies(state))
+            game.send_zoombini(index, random.randint(0, 1))
 
 
 if __name__ == '__main__':
-    if to_train:
-        trainer = ZBrainTrainer()
+    if TO_TRAIN:
+        trainer = BrainTrainer()
         trainer.run()
-        # trainer.test()
+        trainer.test()
     else:
-        trainer = ZBrainTrainer(chkpt='models/brain')
+        trainer = BrainTrainer(chkpt='models/brain')
         trainer.test()

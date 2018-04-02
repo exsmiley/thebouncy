@@ -5,10 +5,13 @@ import itertools
 
 NUM_ZOOMBINIS = 16
 MAX_MISTAKES = 6
+NUM_BRIDGES = 2
 
-ZOOMBINI_VECTOR_LENGTH = 1 + 5*4 + 2 # first bit is unknown bit
-CANDIDATE_LENGTH = 5*4
-INPUT_LENGTH = (NUM_ZOOMBINIS)*ZOOMBINI_VECTOR_LENGTH + CANDIDATE_LENGTH
+ZOOMBINI_AGENT_VECTOR_LENGTH = 5*4 + 2*NUM_BRIDGES
+ZOOMBINI_BRAIN_VECTOR_LENGTH = 5*4 + 3*NUM_BRIDGES
+AGENT_INPUT_LENGTH = (NUM_ZOOMBINIS)*ZOOMBINI_AGENT_VECTOR_LENGTH
+BRAIN_INPUT_LENGTH = (NUM_ZOOMBINIS)*ZOOMBINI_BRAIN_VECTOR_LENGTH
+OUTPUT_LENGTH = (NUM_ZOOMBINIS)*(NUM_BRIDGES)
 FEEDBACK_LENGTH = 2
 
 
@@ -16,7 +19,8 @@ class Zoombini(object):
 
     def __init__(self, features=None):
         self.has_passed = False
-        self.is_top = None
+        self.rejected_bridges = []
+        self.accepted_bridge = None
         if features:
             self.hair = features['hair']
             self.eyes = features['eyes']
@@ -28,29 +32,40 @@ class Zoombini(object):
             self.nose = random.randint(0, 4)
             self.feet = random.randint(0, 4)
 
-    def get_vector(self):
-        vec = [0 for i in range(ZOOMBINI_VECTOR_LENGTH)]
-        if self.is_top is None:
-            vec[0] = 1
-        else:
-            vec[1+self.hair] = 1
-            vec[6+self.eyes] = 1
-            vec[11+self.nose] = 1
-            vec[16+self.feet] = 1
+    def get_agent_vector(self):
+        # actual format is [hair|eyes|nose|feet|rejections|accepted]
+        vec = [0 for i in range(ZOOMBINI_AGENT_VECTOR_LENGTH)]
 
-            # feedback
-            if self.is_top:
-                vec[21] = 1
-            else:
-                vec[22] = 1
-        return vec
-
-    def get_candidate_vector(self):
-        vec = [0 for i in range(CANDIDATE_LENGTH)]
         vec[self.hair] = 1
         vec[5+self.eyes] = 1
         vec[10+self.nose] = 1
         vec[15+self.feet] = 1
+
+        # feedback
+        for i in self.rejected_bridges:
+            vec[20+i] = 1
+
+        if self.accepted_bridge is not None:
+            vec[20+NUM_BRIDGES+self.accepted_bridge] = 1
+
+        return vec
+
+    def get_brain_vector(self):
+        vec = [0 for i in range(ZOOMBINI_BRAIN_VECTOR_LENGTH)]
+
+        vec[self.hair] = 1
+        vec[5+self.eyes] = 1
+        vec[10+self.nose] = 1
+        vec[15+self.feet] = 1
+
+        for i in range(NUM_BRIDGES):
+            if i == self.accepted_bridge:
+                vec[20+i*3] = 1
+            elif i in self.rejected_bridges:
+                vec[20+i*3+1] = 1
+            else:
+                vec[20+i*3+2] = 1
+
         return vec
 
     def __str__(self):
@@ -78,6 +93,11 @@ class Bridge(object):
         satisfies = getattr(zoombini, self.attr) == self.attr_num
         return (satisfies and self.top_true == top) or (not satisfies and self.top_true != top)
 
+    def zoombini_bridge(self, zoombini):
+        for i in range(NUM_BRIDGES):
+            if self.check_pass(zoombini, i):
+                return i
+
     def __str__(self):
         bridge_spot = 'Top' if self.top_true else 'Bottom'
         return 'Bridge Condition: {} bridge says only {} num {}'.format(bridge_spot, self.attr, self.attr_num)
@@ -94,6 +114,7 @@ class Game(object):
             self.zoombinis = [Zoombini() for _ in range(NUM_ZOOMBINIS)]
 
         self.new_game(bridge)
+        self.truth = list(map(lambda z: self.bridge.zoombini_bridge(z), self.zoombinis))
         self.mistakes = 0
 
     def new_game(self, bridge=None):
@@ -106,26 +127,36 @@ class Game(object):
         zoombini = self.zoombinis[index]
         if self.bridge.check_pass(zoombini, top):
             zoombini.has_passed = True
+            zoombini.accepted_bridge = top
         else:
             self.mistakes += 1
+            zoombini.rejected_bridges.append(top)
 
-        # collected information about the zoombini
-        zoombini.is_top = (zoombini.has_passed and top) or (not zoombini.has_passed and not top)
         return zoombini.has_passed
 
     def has_won(self):
         num_passed = sum(map(lambda x: x.has_passed, self.zoombinis))
         return num_passed == len(self.zoombinis)
 
+    def score(self):
+        return sum(map(lambda x: x.has_passed, self.zoombinis))
+
     def can_move(self):
         return self.mistakes < MAX_MISTAKES and not self.has_won()
 
-    def get_state_vector(self, candidate_index):
-        # TODO figure out how to sort zoombinis for "set" behavior
-        zoombinis_vecs = map(lambda x: x.get_vector(), self.zoombinis)
+    def get_agent_state(self):
+        zoombinis_vecs = sorted(map(lambda x: x.get_agent_vector(), self.zoombinis))
         vec = list(itertools.chain.from_iterable(zoombinis_vecs))
-        vec += self.zoombinis[candidate_index].get_candidate_vector()
         return vec
+
+    def get_brain_state(self):
+        # TODO figure out how to sort to keep zoombinis consistent with truth
+        zoombinis_vecs = map(lambda x: x.get_brain_vector(), self.zoombinis)
+        vec = list(itertools.chain.from_iterable(zoombinis_vecs))
+        return vec
+
+    def get_brain_truth(self):
+        return self.truth
 
     def __str__(self):
         return ('Zoombini Game' +

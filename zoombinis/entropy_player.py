@@ -5,9 +5,12 @@ import numpy as np
 
 class EntropyPlayer(object):
 
-    def __init__(self, prob_value=1.):
-        self.brain = ZBrain(chkpt='models/brain')
+    def __init__(self, prob_value=1.0):
+        self.brain = Brain(chkpt='models/brain')
         self.prob_value = prob_value
+
+        # brain that starts with random to just compare with random
+        # self.brain = Brain()
 
 
     def play_game(self, game):
@@ -17,17 +20,17 @@ class EntropyPlayer(object):
         while game.can_move():
             best_entropy = -1
             best_entropy_i = -1
-
-            entropies = []
-
             best_prob = -1
             best_prob_i = -1
 
 
-            for i in indices_remaining:
-                state = game.get_state_vector(i)
+            state = game.get_brain_state()
+            entropies = self.brain.get_entropies(state)
+            probs = self.brain.get_probabilities(state)
 
-                entropy = self.brain.get_entropy(state)
+            for i in indices_remaining:
+                
+                entropy = entropies[i]
 
                 if entropy > best_entropy:
                     best_entropy = entropy
@@ -35,8 +38,8 @@ class EntropyPlayer(object):
 
                 entropies.append(entropy)
 
-                probabilities = self.brain.get_probabilities(state)
-                prob = max(probabilities)
+                my_probs = probs[i]
+                prob = max(my_probs)
 
                 if prob > best_prob:
                     best_prob = prob
@@ -48,9 +51,8 @@ class EntropyPlayer(object):
             else:
                 index = best_entropy_i
 
-            state = game.get_state_vector(i)
-            probabilities = self.brain.get_probabilities(state)
-            send_top = True if np.argmax(probabilities) == 0 else False
+            probabilities = probs[index]
+            send_top = np.argmax(probabilities)
 
             if index in tried:
                 send_top = not tried[index]
@@ -63,20 +65,24 @@ class EntropyPlayer(object):
             if feedback:
                 indices_remaining.remove(index)
 
-        # print 'Won game:', game.has_won()
-        # print 'Score:', 16-len(indices_remaining)
-        return game.has_won()
+        # print('Won game:', game.has_won())
+        # print('Score:', 16-len(indices_remaining))
+        return game.has_won(), NUM_ZOOMBINIS-len(indices_remaining)
 
 if __name__ == '__main__':
     import tqdm
     player = EntropyPlayer()
 
     wins = 0
-    num_games = 1000
+    scores = []
+    num_games = 100
     for i in tqdm.tqdm(range(num_games)):
-        if player.play_game(Game()):
+        won, score = player.play_game(Game())
+        if won:
             wins += 1
-    print('win rate:', 1.*wins/num_games)
+        scores.append(score)
+    print('win rate:', wins/num_games)
+    print('avg score:', sum(scores)/len(scores))
 
 
 
