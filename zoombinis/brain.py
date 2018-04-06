@@ -11,11 +11,16 @@ from torch.autograd import Variable
 
 
 # tunable hyperparameters
-NUM_RUNS = 100000
+NUM_RUNS = 10000
 SAMPLE_SIZE = 20
 LEARNING_RATE = 1e-3
-MOMENTUM = 0.99
-TO_TRAIN = False
+MOMENTUM = 0.9
+TO_TRAIN = True
+USE_OLD = False
+
+OLD_CHKPT = None
+if USE_OLD:
+    OLD_CHKPT = 'models/brain'
 
 
 class Brain(nn.Module):
@@ -31,10 +36,8 @@ class Brain(nn.Module):
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        # TODO later to actually split when training before softmax
         vecs = torch.split(self.fc2(x), NUM_BRIDGES, dim=1)
-        vecs = tuple(map(lambda v: F.softmax(v, dim=-1), vecs))
-        return vecs#torch.cat(vecs)
+        return vecs
 
     def get_entropies(self, state):
         probs = self.get_probabilities(state)
@@ -51,7 +54,10 @@ class Brain(nn.Module):
 
     def get_probabilities(self, state):
         state = Variable(torch.FloatTensor(state).view(-1, BRAIN_INPUT_LENGTH))
-        return list(map(lambda x: list(x.data.numpy()[0]), self.forward(state)))
+        vecs = self.forward(state)
+        # need softmaxes
+        vecs = tuple(map(lambda v: F.softmax(v+1e-8, dim=-1), vecs))
+        return list(map(lambda x: list(x.data.numpy()[0]), vecs))
 
     def load(self, name='models/brain'):
         self.load_state_dict(torch.load(name))
@@ -72,6 +78,7 @@ class BrainTrainer(object):
         self.feedback_buffer = []
 
     def run(self):
+        self.model.train()
         for i in range(NUM_RUNS):
             states, feedbacks = self.play_game()
             self.state_buffer.extend(states)
@@ -103,11 +110,11 @@ class BrainTrainer(object):
             loss = self.criterion(zoombini, feedbacks[i])
             losses.append(loss)
 
-        total_loss = sum(losses)
+        total_loss = sum(losses)/len(losses)
         total_loss.backward()
         self.optimizer.step()
 
-        print('Loss:', total_loss.data.numpy()[0]/len(losses))#sum(losses)/len(losses))
+        print('Loss:', sum(total_loss.data.numpy()))#sum(losses)/len(losses))
 
         # reset buffers
         self.state_buffer = []
@@ -159,7 +166,7 @@ class BrainTrainer(object):
 
 if __name__ == '__main__':
     if TO_TRAIN:
-        trainer = BrainTrainer()
+        trainer = BrainTrainer(chkpt=OLD_CHKPT)
         trainer.run()
         trainer.test()
     else:

@@ -3,8 +3,8 @@ import numpy as np
 import itertools
 
 
-NUM_ZOOMBINIS = 16
-MAX_MISTAKES = 6
+NUM_ZOOMBINIS = 2
+MAX_MISTAKES = 1
 NUM_BRIDGES = 2
 
 ZOOMBINI_AGENT_VECTOR_LENGTH = 5*4 + 2*NUM_BRIDGES
@@ -125,9 +125,13 @@ class Game(object):
 
     def send_zoombini(self, index, top):
         zoombini = self.zoombinis[index]
-        if self.bridge.check_pass(zoombini, top):
+        if self.bridge.check_pass(zoombini, top) and not zoombini.has_passed:
             zoombini.has_passed = True
             zoombini.accepted_bridge = top
+        # can't repeat sending same zoombini
+        elif zoombini.has_passed:
+            self.mistakes += 1
+            return False
         else:
             self.mistakes += 1
             zoombini.rejected_bridges.append(top)
@@ -142,10 +146,10 @@ class Game(object):
         return sum(map(lambda x: x.has_passed, self.zoombinis))
 
     def can_move(self):
-        return self.mistakes < MAX_MISTAKES and not self.has_won()
+        return self.mistakes <= MAX_MISTAKES and not self.has_won()
 
     def get_agent_state(self):
-        zoombinis_vecs = sorted(map(lambda x: x.get_agent_vector(), self.zoombinis))
+        zoombinis_vecs = map(lambda x: x.get_agent_vector(), self.zoombinis)
         vec = list(itertools.chain.from_iterable(zoombinis_vecs))
         return vec
 
@@ -161,11 +165,54 @@ class Game(object):
     def __str__(self):
         return ('Zoombini Game' +
         '\n{}'.format(str(self.bridge)) +
-        '\nZoombinis: {}'.format(map(str, self.zoombinis)) +
+        '\nZoombinis: {}'.format(list(map(str, self.zoombinis))) +
         '\nNum Mistakes: {}'.format(self.mistakes)
     )
 
+class GameEnv(object):
+
+    def __init__(self):
+        self.game = Game()
+        self.state_size = AGENT_INPUT_LENGTH
+        self.action_size = NUM_ZOOMBINIS*NUM_BRIDGES
+        self.actions = set()
+
+    def reset(self):
+        # print('Start game')
+        self.game = Game()
+        self.actions = set()
+        return np.array(self.game.get_agent_state())#.reshape(1, -1)
+
+    def step(self, action, verbose=False):
+        # action is an int
+        # action/num_bridges is the zoombini, action % num_bridges is the bridge
+        self.actions.add(action)
+        zoombini = action//NUM_BRIDGES
+        bridge = action % NUM_BRIDGES
+
+        passed = self.game.send_zoombini(zoombini, bridge)
+
+        state = np.array(self.game.get_agent_state())#.reshape(1, -1)
+        reward = 1 if passed else 0
+        done = not self.game.can_move()
+
+        if verbose:
+            passed_str = 'PASSED' if passed else 'failed'
+            print('Sending Zoombini {} to {} and it {}'.format(zoombini, bridge, passed_str))
+
+        return state, reward, done
+
+    def check_already_made(self, action):
+        return action in self.actions
 
 if __name__ == '__main__':
     g = Game()
     print(g)
+    print(g.send_zoombini(0, 1))
+    print(g.can_move(), 'move')
+    print(g.send_zoombini(0, 0))
+    print(g.can_move(), 'move')
+    print(g.send_zoombini(1, 1))
+    print(g.can_move(), 'move')
+    print(g.send_zoombini(1, 0))
+    print(g.can_move(), 'move')
