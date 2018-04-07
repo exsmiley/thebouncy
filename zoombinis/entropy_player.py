@@ -13,7 +13,7 @@ class EntropyPlayer(object):
         # self.brain = Brain()
 
 
-    def play_game(self, game):
+    def play(self, game):
         indices_remaining = [i for i in range(NUM_ZOOMBINIS)]
         tried = {} # maps indices to previously tried boolean values
 
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     scores = []
     num_games = 100
     for i in tqdm.tqdm(range(num_games)):
-        won, score = player.play_game(Game())
+        won, score = player.play(Game())
         if won:
             wins += 1
         scores.append(score)

@@ -4,6 +4,7 @@ Inspired by https://github.com/MorvanZhou/pytorch-A3C
 
 import torch
 import torch.nn as nn
+import numpy as np
 from actor_utils import v_wrap, set_init, push_and_pull, record, SharedAdam
 import torch.nn.functional as F
 import torch.multiprocessing as mp
@@ -11,9 +12,9 @@ import os
 from zoombinis import *
 os.environ["OMP_NUM_THREADS"] = "1"
 
-UPDATE_GLOBAL_ITER = 10
+UPDATE_GLOBAL_ITER = 15
 GAMMA = 0.9
-MAX_EP = 5000
+MAX_EP = 2000
 
 env = GameEnv()
 N_S = env.state_size
@@ -29,8 +30,7 @@ class Net(nn.Module):
         self.pi2 = nn.Linear(1000, a_dim)
         self.v1 = nn.Linear(s_dim, 1000)
         self.v2 = nn.Linear(1000, 1)
-        # set_init([self.pi1, self.pi2, self.v1, self.v2])
-        self.distribution = torch.distributions.Categorical
+        set_init([self.pi1, self.pi2, self.v1, self.v2])
 
     def forward(self, x):
         pi1 = F.relu(self.pi1(x))
@@ -44,7 +44,7 @@ class Net(nn.Module):
         logits, _ = self.forward(s)
 
         prob = F.softmax(logits, dim=1).data
-        m = self.distribution(prob)
+        m = distributions.Multinomial(total_count, probs)
         if verbose:
             print('probs', prob.numpy()[0])
         return m.sample().numpy()[0]
@@ -86,10 +86,10 @@ class Worker(mp.Process):
             s = self.env.reset()
             buffer_s, buffer_a, buffer_r = [], [], []
             ep_r = 0.
+            repeat_count = 0
             while True:
                 a = self.lnet.choose_action(v_wrap(s[None, :]))
                 already_made_move = self.env.check_already_made(a)
-                s_, r, done = self.env.step(a)
 
                 # TODO update rewards
                 # if already_made_move:
@@ -97,7 +97,15 @@ class Worker(mp.Process):
                 #     r = -1
                 #     print('BAD')
                 # print(done, r, a)
-                # if done: r = 1;print('done!')
+                if already_made_move:
+                    repeat_count += 1
+                    if repeat_count > 3:
+                        a = np.int64(random.randint(0, N_A-1))
+                    if repeat_count < 3 or self.env.check_already_made(a):
+                        continue
+
+                s_, r, done = self.env.step(a)
+
                 ep_r += r
                 buffer_a.append(a)
                 buffer_s.append(s)
@@ -113,16 +121,17 @@ class Worker(mp.Process):
                         break
                 s = s_
                 total_step += 1
+                repeat_count = 0
         self.res_queue.put(None)
 
-class Tester(object):
+class ActorPlayer(object):
 
     def __init__(self):
         self.net = Net(N_S, N_A)
         self.net.load()
         self.env = GameEnv()
 
-    def run(self):
+    def test(self):
         s = self.env.reset()
         done = False
         reward = 0
@@ -135,7 +144,11 @@ class Tester(object):
             a = self.net.choose_action(v_wrap(s[None, :]), verbose=True)
             already_made_move = self.env.check_already_made(a)
             if already_made_move:
-                continue
+                repeat_count += 1
+                if repeat_count > 3:
+                    a = random.randint(0, N_A-1)
+                if repeat_count < 3 or self.env.check_already_made(a):
+                    continue
             print('Action', a)
             s, r, done = self.env.step(a, verbose=True)
             reward += r
@@ -145,10 +158,36 @@ class Tester(object):
 
         # for z in self.env.game.zoombinis:
         #     print(z.get_agent_vector())
+        return self.env.game.has_won(), reward
+
+    def play(self, game=None):
+        s = self.env.reset(game=game)
+        done = False
+        reward = 0
+        num_steps = 0
+        repeat_count = 0
+
+        while not done:
+            a = self.net.choose_action(v_wrap(s[None, :]))
+            already_made_move = self.env.check_already_made(a)
+            if already_made_move:
+                repeat_count += 1
+                if repeat_count > 3:
+                    a = random.randint(0, N_A-1)
+                if repeat_count < 3 or self.env.check_already_made(a):
+                    continue
+            s, r, done = self.env.step(a)
+            reward += r
+            num_steps += 1
+            repeat_count = 0
+
+        return self.env.game.has_won(), reward        
+
 
 
 if __name__ == "__main__":
     gnet = Net(N_S, N_A)        # global network
+    # gnet.load()
     gnet.share_memory()         # share the global parameters in multiprocessing
     opt = SharedAdam(gnet.parameters(), lr=1e-3)      # global optimizer
     global_ep, global_ep_r, res_queue = mp.Value('i', 0), mp.Value('d', 0.), mp.Queue()
@@ -173,4 +212,4 @@ if __name__ == "__main__":
     plt.xlabel('Step')
     plt.show()
 
-    Tester().run()
+    ActorPlayer().test()

@@ -18,9 +18,7 @@ FEEDBACK_LENGTH = 2
 class Zoombini(object):
 
     def __init__(self, features=None):
-        self.has_passed = False
-        self.rejected_bridges = []
-        self.accepted_bridge = None
+        self.reset()
         if features:
             self.hair = features['hair']
             self.eyes = features['eyes']
@@ -67,6 +65,11 @@ class Zoombini(object):
                 vec[20+i*3+2] = 1
 
         return vec
+
+    def reset(self):
+        self.has_passed = False
+        self.rejected_bridges = []
+        self.accepted_bridge = None
 
     def __str__(self):
         return '<Zoombini object - hair: {} eyes: {} nose: {} feet: {} has_passed: {} >'.format(
@@ -162,6 +165,11 @@ class Game(object):
     def get_brain_truth(self):
         return self.truth
 
+    def reset(self):
+        self.mistakes = 0
+        for zoombini in self.zoombinis:
+            zoombini.reset()
+
     def __str__(self):
         return ('Zoombini Game' +
         '\n{}'.format(str(self.bridge)) +
@@ -177,9 +185,9 @@ class GameEnv(object):
         self.action_size = NUM_ZOOMBINIS*NUM_BRIDGES
         self.actions = set()
 
-    def reset(self):
+    def reset(self, game=None):
         # print('Start game')
-        self.game = Game()
+        self.game = game if game else Game()
         self.actions = set()
         return np.array(self.game.get_agent_state())#.reshape(1, -1)
 
