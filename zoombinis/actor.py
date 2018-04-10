@@ -1,67 +1,51 @@
-"""
-Inspired by https://github.com/MorvanZhou/pytorch-A3C
-"""
+import argparse
+import pickle
+import numpy as np
+import random
+import traceback
+from itertools import count
+from collections import namedtuple
+from zoombinis import *
+from brain import EntropyRewardOracle
 
 import torch
 import torch.nn as nn
-import numpy as np
-from actor_utils import v_wrap, set_init, push_and_pull, record, SharedAdam
 import torch.nn.functional as F
-import torch.multiprocessing as mp
-import os
-from zoombinis import *
-os.environ["OMP_NUM_THREADS"] = "1"
-
-UPDATE_GLOBAL_ITER = 15
-GAMMA = 0.9
-MAX_EP = 2000
-
-env = GameEnv()
-N_S = env.state_size
-N_A = env.action_size
+import torch.optim as optim
+from torch.autograd import Variable
+from torch.distributions import Categorical
 
 
-class Net(nn.Module):
-    def __init__(self, s_dim, a_dim):
-        super(Net, self).__init__()
-        self.s_dim = s_dim
-        self.a_dim = a_dim
-        self.pi1 = nn.Linear(s_dim, 1000)
-        self.pi2 = nn.Linear(1000, a_dim)
-        self.v1 = nn.Linear(s_dim, 1000)
-        self.v2 = nn.Linear(1000, 1)
-        set_init([self.pi1, self.pi2, self.v1, self.v2])
+USE_SHAPER = False
+
+GAMMA = 0.99
+SEED = 543
+LOG_INTERVAL = 10
+
+torch.manual_seed(SEED)
+
+SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
+
+
+class Policy(nn.Module):
+    def __init__(self):
+        super(Policy, self).__init__()
+        # input_length = 4
+        input_length = AGENT_INPUT_LENGTH
+        layer_size = 128
+        # layer_size = 1000
+        self.affine1 = nn.Linear(input_length, layer_size)
+        self.action_head = nn.Linear(layer_size, OUTPUT_LENGTH)
+        self.value_head = nn.Linear(layer_size, 1)
+
+        self.saved_actions = []
+        self.rewards = []
 
     def forward(self, x):
-        pi1 = F.relu(self.pi1(x))
-        logits = self.pi2(pi1)
-        v1 = F.relu(self.v1(x))
-        values = self.v2(v1)
-        return logits, values
-
-    def choose_action(self, s, verbose=False):
-        self.eval()
-        logits, _ = self.forward(s)
-
-        prob = F.softmax(logits, dim=1).data
-        m = distributions.Multinomial(total_count, probs)
-        if verbose:
-            print('probs', prob.numpy()[0])
-        return m.sample().numpy()[0]
-
-    def loss_func(self, s, a, v_t):
-        self.train()
-        logits, values = self.forward(s)
-        td = v_t - values
-        c_loss = td.pow(2)
-        
-        probs = F.softmax(logits, dim=1)
-        m = self.distribution(probs)
-        exp_v = m.log_prob(a) * td.detach()
-        a_loss = -exp_v
-        # print('Loss', c_loss, a_loss)
-        total_loss = (c_loss + a_loss).mean()
-        return total_loss
+        x = F.relu(self.affine1(x))
+        action_scores = self.action_head(x)
+        state_values = self.value_head(x)
+        return F.softmax(action_scores, dim=-1), state_values
 
     def load(self, name='models/actor'):
         self.load_state_dict(torch.load(name))
@@ -71,145 +55,112 @@ class Net(nn.Module):
         torch.save(self.state_dict(), name)
         print('Saved model to {}!'.format(name))
 
-class Worker(mp.Process):
-    def __init__(self, gnet, opt, global_ep, global_ep_r, res_queue, name):
-        super(Worker, self).__init__()
-        self.name = 'w%i' % name
-        self.g_ep, self.g_ep_r, self.res_queue = global_ep, global_ep_r, res_queue
-        self.gnet, self.opt = gnet, opt
-        self.lnet = Net(N_S, N_A)           # local network
-        self.env = GameEnv()
+    def select_action(self, state):
+        state = torch.from_numpy(state).float()
+        probs, state_value = self.forward(Variable(state))
+    
+        m = Categorical(probs)
+        action = m.sample()
+        self.saved_actions.append(SavedAction(m.log_prob(action), state_value))
+        return action.data[0]
 
-    def run(self):
-        total_step = 1
-        while self.g_ep.value < MAX_EP:
-            s = self.env.reset()
-            buffer_s, buffer_a, buffer_r = [], [], []
-            ep_r = 0.
-            repeat_count = 0
-            while True:
-                a = self.lnet.choose_action(v_wrap(s[None, :]))
-                already_made_move = self.env.check_already_made(a)
+    def select_action2(self, state, cant_use):
+        # zeros out any unavailable options and rebalances to make sum to 1
+        state = torch.from_numpy(state).float()
+        probs, state_value = self.forward(Variable(state))
+        m = Categorical(probs)
+        action = m.sample()
 
-                # TODO update rewards
-                # if already_made_move:
-                #     continue
-                #     r = -1
-                #     print('BAD')
-                # print(done, r, a)
-                if already_made_move:
-                    repeat_count += 1
-                    if repeat_count > 3:
-                        a = np.int64(random.randint(0, N_A-1))
-                    if repeat_count < 3 or self.env.check_already_made(a):
-                        continue
+        probs2 = probs.data.numpy()
+        for ind in cant_use:
+            probs2[ind] = 0
+        probs2 = probs2 / np.sum(probs2)
+        action = np.random.choice(len(probs2), p=probs2)
+        action = Variable(torch.from_numpy(np.array([action])))
+        
+        self.saved_actions.append(SavedAction(m.log_prob(action), state_value))
+        return action.data[0]
 
-                s_, r, done = self.env.step(a)
-
-                ep_r += r
-                buffer_a.append(a)
-                buffer_s.append(s)
-                buffer_r.append(r)
-
-                if total_step % UPDATE_GLOBAL_ITER == 0 or done:  # update global and assign to local net
-                    # sync
-                    push_and_pull(self.opt, self.lnet, self.gnet, done, s_, buffer_s, buffer_a, buffer_r, GAMMA)
-                    buffer_s, buffer_a, buffer_r = [], [], []
-
-                    if done:  # done and print information
-                        record(self.g_ep, self.g_ep_r, ep_r, self.res_queue, self.name)
-                        break
-                s = s_
-                total_step += 1
-                repeat_count = 0
-        self.res_queue.put(None)
-
-class ActorPlayer(object):
-
-    def __init__(self):
-        self.net = Net(N_S, N_A)
-        self.net.load()
-        self.env = GameEnv()
-
-    def test(self):
-        s = self.env.reset()
-        done = False
-        reward = 0
-        num_steps = 0
-
-        print('Playing game!')
-        print(self.env.game)
-
-        while not done:
-            a = self.net.choose_action(v_wrap(s[None, :]), verbose=True)
-            already_made_move = self.env.check_already_made(a)
-            if already_made_move:
-                repeat_count += 1
-                if repeat_count > 3:
-                    a = random.randint(0, N_A-1)
-                if repeat_count < 3 or self.env.check_already_made(a):
-                    continue
-            print('Action', a)
-            s, r, done = self.env.step(a, verbose=True)
-            reward += r
-            num_steps += 1
-
-        print('Steps {} | Reward {}'.format(num_steps, reward))
-
-        # for z in self.env.game.zoombinis:
-        #     print(z.get_agent_vector())
-        return self.env.game.has_won(), reward
-
-    def play(self, game=None):
-        s = self.env.reset(game=game)
-        done = False
-        reward = 0
-        num_steps = 0
-        repeat_count = 0
-
-        while not done:
-            a = self.net.choose_action(v_wrap(s[None, :]))
-            already_made_move = self.env.check_already_made(a)
-            if already_made_move:
-                repeat_count += 1
-                if repeat_count > 3:
-                    a = random.randint(0, N_A-1)
-                if repeat_count < 3 or self.env.check_already_made(a):
-                    continue
-            s, r, done = self.env.step(a)
-            reward += r
-            num_steps += 1
-            repeat_count = 0
-
-        return self.env.game.has_won(), reward        
+def finish_episode(model, optimizer):
+    R = 0
+    saved_actions = model.saved_actions
+    policy_losses = []
+    value_losses = []
+    rewards = []
+    for r in model.rewards[::-1]:
+        R = r + GAMMA * R
+        rewards.insert(0, R)
+    rewards = torch.Tensor(rewards)
+    rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
+    for (log_prob, value), r in zip(saved_actions, rewards):
+        reward = r - value.data[0]
+        policy_losses.append(-log_prob * reward)
+        value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([r]))))
+    optimizer.zero_grad()
+    loss = torch.stack(policy_losses).sum() + torch.stack(value_losses).sum()
+    loss.backward()
+    optimizer.step()
+    del model.rewards[:]
+    del model.saved_actions[:]
 
 
+def main(model, running_reward_list):
+    env = GameEnv()
+    
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
-if __name__ == "__main__":
-    gnet = Net(N_S, N_A)        # global network
-    # gnet.load()
-    gnet.share_memory()         # share the global parameters in multiprocessing
-    opt = SharedAdam(gnet.parameters(), lr=1e-3)      # global optimizer
-    global_ep, global_ep_r, res_queue = mp.Value('i', 0), mp.Value('d', 0.), mp.Queue()
+    if USE_SHAPER:
+        reward_shaper = EntropyRewardOracle()
 
-    # parallel training
-    NUM_WORKERS = 1#mp.cpu_count()
-    workers = [Worker(gnet, opt, global_ep, global_ep_r, res_queue, i) for i in range(NUM_WORKERS)]
-    [w.start() for w in workers]
-    res = []                    # record episode reward to plot
-    while True:
-        r = res_queue.get()
-        if r is not None:
-            res.append(r)
+    running_reward = 1
+
+    for i_episode in count(1):
+        state = env.reset()
+        total_reward = 0
+        made_actions = set()
+        for t in range(10000):  # Don't infinite loop while learning
+            cant_use = env.get_invalid_moves()
+            action = model.select_action2(state, cant_use)
+
+
+            if USE_SHAPER:
+                state, reward, done, additional = env.step(action, reward_shaper=reward_shaper)
+            else:   
+                state, reward, done = env.step(action)
+                additional = 0
+
+            total_reward += reward
+            model.rewards.append(reward+additional)
+            if done:
+                made_actions = set()
+                break
+        if i_episode == 0:
+            running_reward = running_reward
         else:
+            running_reward = running_reward * 0.99 + total_reward * 0.01
+        # reward_list.append(total_reward)
+        running_reward_list.append(running_reward)
+        finish_episode(model, optimizer)
+        if i_episode % LOG_INTERVAL == 0:
+            print('Episode {}\tLast length/reward: {:5d}/{}\tAverage reward: {:.2f}'.format(
+                i_episode, t+1, total_reward, running_reward))
+        if running_reward > env.winning_threshold:#env.spec.reward_threshold:
+            print("Solved {}! Running reward is now {} and "
+                  "the last episode runs to {} time steps!".format(i_episode, running_reward, t))
             break
-    [w.join() for w in workers]
-    gnet.save()
+        # if i_episode % 10000 == 0:
+        #     pickle.dump( reward_list, open( "data/reward_raw{}.p".format(i_episode), "wb" ) )
+        #     reward_list = []
 
-    import matplotlib.pyplot as plt
-    plt.plot(res)
-    plt.ylabel('Moving average ep reward')
-    plt.xlabel('Step')
-    plt.show()
-
-    ActorPlayer().test()
+if __name__ == '__main__':
+    try:
+        model = Policy()
+        running_reward_list = []
+        main(model, running_reward_list)
+    except:
+        traceback.print_exc()
+    finally:
+        model.save()
+        import matplotlib.pyplot as plt
+        plt.plot(running_reward_list)
+        plt.show()

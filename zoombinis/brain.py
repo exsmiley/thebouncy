@@ -17,6 +17,7 @@ LEARNING_RATE = 1e-3
 MOMENTUM = 0.9
 TO_TRAIN = True
 USE_OLD = False
+REWARD_SCALE_FACTOR = 10 # amount to divide entropy by
 
 OLD_CHKPT = None
 if USE_OLD:
@@ -67,11 +68,12 @@ class Brain(nn.Module):
         torch.save(self.state_dict(), name)
         print('Saved model to {}!'.format(name))
 
+
 class BrainTrainer(object):
 
     def __init__(self, chkpt=None):
         self.model = Brain(chkpt=chkpt)
-        self.optimizer = optim.SGD(self.model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
+        self.optimizer = optim.SGD(self.model.parameters(), lr=LEARNING_RATE)
         self.criterion = nn.CrossEntropyLoss()
 
         self.state_buffer = []
@@ -89,6 +91,9 @@ class BrainTrainer(object):
                 self.train()
 
         self.model.save()
+
+    def run_with_actor(self):
+        from actor import select_action, Policy
 
     def train(self):
         all_indices = [i for i in range(len(self.state_buffer))]
@@ -162,6 +167,16 @@ class BrainTrainer(object):
             print('\nPRED:', pred)
             print('ENTROPIES:', self.model.get_entropies(state))
             game.send_zoombini(index, random.randint(0, 1))
+
+
+class EntropyRewardOracle(object):
+
+    def __init__(self):
+        self.brain = Brain(chkpt='models/brain')
+
+    def get_reward(self, state, action):
+        entropies = self.brain.get_entropies(state)
+        return entropies[action]/REWARD_SCALE_FACTOR
 
 
 if __name__ == '__main__':

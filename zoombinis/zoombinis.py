@@ -1,10 +1,11 @@
 import random
 import numpy as np
 import itertools
+import functools
 
 
-NUM_ZOOMBINIS = 2
-MAX_MISTAKES = 1
+NUM_ZOOMBINIS = 4
+MAX_MISTAKES = 2
 NUM_BRIDGES = 2
 
 ZOOMBINI_AGENT_VECTOR_LENGTH = 5*4 + 2*NUM_BRIDGES
@@ -59,8 +60,9 @@ class Zoombini(object):
         for i in range(NUM_BRIDGES):
             if i == self.accepted_bridge:
                 vec[20+i*3] = 1
-            elif i in self.rejected_bridges:
+            elif i in self.rejected_bridges or self.has_passed:
                 vec[20+i*3+1] = 1
+            # unknown
             else:
                 vec[20+i*3+2] = 1
 
@@ -75,6 +77,18 @@ class Zoombini(object):
         return '<Zoombini object - hair: {} eyes: {} nose: {} feet: {} has_passed: {} >'.format(
             self.hair, self.eyes, self.nose, self.feet, self.has_passed
         )
+
+
+def sort_zoombinis(zoombinis):
+    def sort_func(a, b):
+        if a.hair != b.hair:
+            return a.hair - b.hair
+        if a.eyes != b.eyes:
+            return a.eyes - b.eyes
+        if a.nose != b.eyes:
+            return a.nose - b.nose
+        return a.feet - b.feet
+    return sorted(zoombinis, key=functools.cmp_to_key(sort_func))
 
 
 class Bridge(object):
@@ -114,7 +128,8 @@ class Game(object):
             self.zoombinis = zoombinis
         else:
             # init zoombinis randomly
-            self.zoombinis = [Zoombini() for _ in range(NUM_ZOOMBINIS)]
+            # self.zoombinis = [Zoombini() for _ in range(NUM_ZOOMBINIS)]
+            self.zoombinis = sort_zoombinis([Zoombini() for _ in range(NUM_ZOOMBINIS)])
 
         self.new_game(bridge)
         self.truth = list(map(lambda z: self.bridge.zoombini_bridge(z), self.zoombinis))
@@ -133,7 +148,7 @@ class Game(object):
             zoombini.accepted_bridge = top
         # can't repeat sending same zoombini
         elif zoombini.has_passed:
-            self.mistakes += 1
+            # self.mistakes += 1
             return False
         else:
             self.mistakes += 1
@@ -184,6 +199,7 @@ class GameEnv(object):
         self.state_size = AGENT_INPUT_LENGTH
         self.action_size = NUM_ZOOMBINIS*NUM_BRIDGES
         self.actions = set()
+        self.winning_threshold = NUM_ZOOMBINIS-0.3
 
     def reset(self, game=None):
         # print('Start game')
@@ -191,12 +207,14 @@ class GameEnv(object):
         self.actions = set()
         return np.array(self.game.get_agent_state())#.reshape(1, -1)
 
-    def step(self, action, verbose=False):
+    def step(self, action, verbose=False, reward_shaper=None):
         # action is an int
         # action/num_bridges is the zoombini, action % num_bridges is the bridge
         self.actions.add(action)
         zoombini = action//NUM_BRIDGES
         bridge = action % NUM_BRIDGES
+
+        already_passed = self.game.zoombinis[zoombini].has_passed
 
         passed = self.game.send_zoombini(zoombini, bridge)
 
@@ -207,11 +225,26 @@ class GameEnv(object):
         if verbose:
             passed_str = 'PASSED' if passed else 'failed'
             print('Sending Zoombini {} to {} and it {}'.format(zoombini, bridge, passed_str))
+        if reward_shaper:
+            if already_passed:
+                reward2 = 0
+            else:
+                reward2 = reward_shaper.get_reward(self.game.get_brain_state(), action)
+            return state, reward, done, reward2
+        else:
+            return state, reward, done
 
-        return state, reward, done
+    def check_valid_move(self, action):
+        zoombini = action//NUM_BRIDGES
+        return not self.game.zoombinis[zoombini].has_passed
 
-    def check_already_made(self, action):
-        return action in self.actions
+    def get_invalid_moves(self):
+        inds = []
+        for i in range(len(self.game.zoombinis)):
+            if self.game.zoombinis[i].has_passed:
+                inds.append(2*i)
+                inds.append(2*i+1)
+        return inds
 
 if __name__ == '__main__':
     g = Game()
