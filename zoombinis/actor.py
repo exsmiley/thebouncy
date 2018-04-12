@@ -14,7 +14,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 from torch.distributions import Categorical
-
+np.set_printoptions(suppress=True)
 
 USE_SHAPER = False
 
@@ -64,7 +64,7 @@ class Policy(nn.Module):
         self.saved_actions.append(SavedAction(m.log_prob(action), state_value))
         return action.data[0]
 
-    def select_action2(self, state, cant_use):
+    def select_action2(self, state, invalid_moves):
         # zeros out any unavailable options and rebalances to make sum to 1
         state = torch.from_numpy(state).float()
         probs, state_value = self.forward(Variable(state))
@@ -72,11 +72,13 @@ class Policy(nn.Module):
         action = m.sample()
 
         probs2 = probs.data.numpy()
-        for ind in cant_use:
+        for ind in invalid_moves:
             probs2[ind] = 0
         probs2 = probs2 / np.sum(probs2)
         action = np.random.choice(len(probs2), p=probs2)
         action = Variable(torch.from_numpy(np.array([action])))
+        # print(probs2, action)
+        # print(probs2)
         
         self.saved_actions.append(SavedAction(m.log_prob(action), state_value))
         return action.data[0]
@@ -119,9 +121,8 @@ def main(model, running_reward_list):
         total_reward = 0
         made_actions = set()
         for t in range(10000):  # Don't infinite loop while learning
-            cant_use = env.get_invalid_moves()
-            action = model.select_action2(state, cant_use)
-
+            invalid_moves = env.get_invalid_moves()
+            action = model.select_action2(state, invalid_moves)
 
             if USE_SHAPER:
                 state, reward, done, additional = env.step(action, reward_shaper=reward_shaper)
@@ -138,7 +139,7 @@ def main(model, running_reward_list):
             running_reward = running_reward
         else:
             running_reward = running_reward * 0.99 + total_reward * 0.01
-        # reward_list.append(total_reward)
+
         running_reward_list.append(running_reward)
         finish_episode(model, optimizer)
         if i_episode % LOG_INTERVAL == 0:
@@ -148,9 +149,31 @@ def main(model, running_reward_list):
             print("Solved {}! Running reward is now {} and "
                   "the last episode runs to {} time steps!".format(i_episode, running_reward, t))
             break
-        # if i_episode % 10000 == 0:
-        #     pickle.dump( reward_list, open( "data/reward_raw{}.p".format(i_episode), "wb" ) )
-        #     reward_list = []
+
+
+class ActorPlayer(object):
+
+    def __init__(self):
+        self.policy = Policy()
+        self.policy.load()
+
+    def play(self, game):
+        # print(game)
+        # print(game.truth)
+        score = 0
+        while game.can_move():
+            invalid_moves = game.get_invalid_moves()
+            state = np.array(game.get_agent_state())
+            action = self.policy.select_action2(state, invalid_moves)
+
+            zoombini = action//NUM_BRIDGES
+            bridge = action % NUM_BRIDGES
+            passed = game.send_zoombini(zoombini, bridge)
+            if passed:
+                score += 1
+
+        return game.has_won(), score
+
 
 if __name__ == '__main__':
     try:

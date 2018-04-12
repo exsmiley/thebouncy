@@ -4,8 +4,8 @@ import itertools
 import functools
 
 
-NUM_ZOOMBINIS = 4
-MAX_MISTAKES = 2
+NUM_ZOOMBINIS = 10
+MAX_MISTAKES = 5
 NUM_BRIDGES = 2
 
 ZOOMBINI_AGENT_VECTOR_LENGTH = 5*4 + 2*NUM_BRIDGES
@@ -74,8 +74,8 @@ class Zoombini(object):
         self.accepted_bridge = None
 
     def __str__(self):
-        return '<Zoombini object - hair: {} eyes: {} nose: {} feet: {} has_passed: {} >'.format(
-            self.hair, self.eyes, self.nose, self.feet, self.has_passed
+        return '<Zoombini object - hair: {} eyes: {} nose: {} feet: {} has_passed: {} rejected: {} accepted: {}>'.format(
+            self.hair, self.eyes, self.nose, self.feet, self.has_passed, self.rejected_bridges, self.accepted_bridge
         )
 
 
@@ -142,6 +142,7 @@ class Game(object):
             self.bridge = Bridge()
 
     def send_zoombini(self, index, top):
+        top = 1 if top else 0
         zoombini = self.zoombinis[index]
         if self.bridge.check_pass(zoombini, top) and not zoombini.has_passed:
             zoombini.has_passed = True
@@ -153,6 +154,8 @@ class Game(object):
         else:
             self.mistakes += 1
             zoombini.rejected_bridges.append(top)
+        did_pass = 'passed' if zoombini.has_passed else 'failed'
+        # print('sending {} to {} and it {}'.format(index, top, did_pass))
 
         return zoombini.has_passed
 
@@ -184,6 +187,14 @@ class Game(object):
         self.mistakes = 0
         for zoombini in self.zoombinis:
             zoombini.reset()
+
+    def get_invalid_moves(self):
+        inds = []
+        for i in range(len(self.zoombinis)):
+            if self.zoombinis[i].has_passed:
+                inds.append(2*i)
+                inds.append(2*i+1)
+        return inds
 
     def __str__(self):
         return ('Zoombini Game' +
@@ -239,12 +250,7 @@ class GameEnv(object):
         return not self.game.zoombinis[zoombini].has_passed
 
     def get_invalid_moves(self):
-        inds = []
-        for i in range(len(self.game.zoombinis)):
-            if self.game.zoombinis[i].has_passed:
-                inds.append(2*i)
-                inds.append(2*i+1)
-        return inds
+        return self.game.get_invalid_moves()
 
 if __name__ == '__main__':
     g = Game()

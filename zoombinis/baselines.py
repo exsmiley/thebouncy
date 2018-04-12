@@ -14,6 +14,7 @@ class EntropyPlayer(object):
 
 
     def play(self, game):
+        score = 0
         indices_remaining = [i for i in range(NUM_ZOOMBINIS)]
         tried = {} # maps indices to previously tried boolean values
 
@@ -64,10 +65,66 @@ class EntropyPlayer(object):
 
             if feedback:
                 indices_remaining.remove(index)
+                score += 1
 
-        # print('Won game:', game.has_won())
-        # print('Score:', 16-len(indices_remaining))
-        return game.has_won(), NUM_ZOOMBINIS-len(indices_remaining)
+        return game.has_won(), score
+
+
+class RandomPlayer():
+
+    def play(self, game):
+        possible_moves = set([i for i in range(NUM_ZOOMBINIS*2)])
+        next_move = None
+        score = 0
+
+        while game.can_move():
+            for invalid in game.get_invalid_moves():
+                if invalid in possible_moves:
+                    possible_moves.remove(invalid)
+
+            action = random.choice(list(possible_moves))
+
+            zoombini = action//NUM_BRIDGES
+            bridge = action % NUM_BRIDGES
+
+            result = game.send_zoombini(zoombini, bridge)
+
+            if result:
+                score += 1
+        return game.has_won(), score
+
+
+class RandomFlipFlop():
+
+    def play(self, game):
+        possible_moves = set([i for i in range(NUM_ZOOMBINIS*2)])
+        next_move = None
+        score = 0
+
+        while game.can_move():
+            for invalid in game.get_invalid_moves():
+                if invalid in possible_moves:
+                    possible_moves.remove(invalid)
+
+            if next_move:
+                action = next_move
+                next_move = None
+            else:
+                action = random.choice(list(possible_moves))
+
+            zoombini = action//NUM_BRIDGES
+            bridge = action % NUM_BRIDGES
+
+            result = game.send_zoombini(zoombini, bridge)
+
+            if not result and action % 2 == 0:
+                next_move = action + 1
+            elif not result:
+                next_move = action - 1
+            else:
+                score += 1
+        return game.has_won(), score
+
 
 if __name__ == '__main__':
     import tqdm

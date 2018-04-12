@@ -13,9 +13,9 @@ from torch.autograd import Variable
 # tunable hyperparameters
 NUM_RUNS = 10000
 SAMPLE_SIZE = 20
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 3e-2
 MOMENTUM = 0.9
-TO_TRAIN = True
+TO_TRAIN = False
 USE_OLD = False
 REWARD_SCALE_FACTOR = 10 # amount to divide entropy by
 
@@ -92,9 +92,6 @@ class BrainTrainer(object):
 
         self.model.save()
 
-    def run_with_actor(self):
-        from actor import select_action, Policy
-
     def train(self):
         all_indices = [i for i in range(len(self.state_buffer))]
         indices = set(random.sample(all_indices, SAMPLE_SIZE))
@@ -115,7 +112,7 @@ class BrainTrainer(object):
             loss = self.criterion(zoombini, feedbacks[i])
             losses.append(loss)
 
-        total_loss = sum(losses)/len(losses)
+        total_loss = sum(losses)#/len(losses)
         total_loss.backward()
         self.optimizer.step()
 
@@ -148,6 +145,7 @@ class BrainTrainer(object):
 
     def test(self):
         game = Game()
+        print(game)
         sent_indices = set()
         states = []
         feedbacks = []
@@ -163,7 +161,7 @@ class BrainTrainer(object):
 
             state = game.get_brain_state()
             pred = self.model.get_probabilities(state)
-            # print('\nSTATE:', state)
+            print('\nSTATE:', state)
             print('\nPRED:', pred)
             print('ENTROPIES:', self.model.get_entropies(state))
             game.send_zoombini(index, random.randint(0, 1))
