@@ -4,8 +4,8 @@ import itertools
 import functools
 
 
-NUM_ZOOMBINIS = 10
-MAX_MISTAKES = 5
+NUM_ZOOMBINIS = 16
+MAX_MISTAKES = 6
 NUM_BRIDGES = 2
 
 ZOOMBINI_AGENT_VECTOR_LENGTH = 5*4 + 2*NUM_BRIDGES
@@ -67,6 +67,17 @@ class Zoombini(object):
                 vec[20+i*3+2] = 1
 
         return vec
+
+    def json(self):
+        return {
+            "hair": self.hair,
+            "eyes": self.eyes,
+            "nose": self.nose,
+            "feet": self.feet,
+            "has_passed": self.has_passed,
+            "rejected": self.rejected_bridges,
+            "accepted": self.accepted_bridge
+        }
 
     def reset(self):
         self.has_passed = False
@@ -167,7 +178,7 @@ class Game(object):
         return sum(map(lambda x: x.has_passed, self.zoombinis))
 
     def can_move(self):
-        return self.mistakes <= MAX_MISTAKES and not self.has_won()
+        return self.mistakes < MAX_MISTAKES and not self.has_won()
 
     def get_agent_state(self):
         zoombinis_vecs = map(lambda x: x.get_agent_vector(), self.zoombinis)
@@ -195,6 +206,12 @@ class Game(object):
                 inds.append(2*i)
                 inds.append(2*i+1)
         return inds
+
+    def zoombinis_json(self):
+        zoombinis = [z.json() for z in self.zoombinis]
+        for i in range(len(zoombinis)):
+            zoombinis[i]['id'] = i
+        return zoombinis
 
     def __str__(self):
         return ('Zoombini Game' +
