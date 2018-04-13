@@ -135,8 +135,8 @@ class BrainTrainer(object):
             while index in sent_indices:
                 index = random.randint(0, NUM_ZOOMBINIS-1)
 
-            state = game.get_brain_state()
             game.send_zoombini(index, random.randint(0, 1))
+            state = game.get_brain_state()
 
             states.append(state)
             feedbacks.append(game.get_brain_truth())
@@ -161,7 +161,7 @@ class BrainTrainer(object):
 
             state = game.get_brain_state()
             pred = self.model.get_probabilities(state)
-            print('\nSTATE:', state)
+            # print('\nSTATE:', state)
             print('\nPRED:', pred)
             print('ENTROPIES:', self.model.get_entropies(state))
             game.send_zoombini(index, random.randint(0, 1))

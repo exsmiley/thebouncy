@@ -14,6 +14,7 @@ class EntropyPlayer(object):
 
 
     def play(self, game):
+        print(game)
         score = 0
         indices_remaining = [i for i in range(NUM_ZOOMBINIS)]
         tried = {} # maps indices to previously tried boolean values
@@ -28,6 +29,11 @@ class EntropyPlayer(object):
             state = game.get_brain_state()
             entropies = self.brain.get_entropies(state)
             probs = self.brain.get_probabilities(state)
+            print('probabilities')
+            print(probs)
+            print()
+            print('entropies')
+            print(entropies)
 
             for i in indices_remaining:
                 
@@ -62,6 +68,8 @@ class EntropyPlayer(object):
             tried[index] = send_top
 
             feedback = game.send_zoombini(index, send_top)
+            print(index, send_top, feedback)
+            print()
 
             if feedback:
                 indices_remaining.remove(index)
@@ -97,6 +105,7 @@ class RandomPlayer():
 class RandomFlipFlop():
 
     def play(self, game):
+
         possible_moves = set([i for i in range(NUM_ZOOMBINIS*2)])
         next_move = None
         score = 0
@@ -132,7 +141,7 @@ if __name__ == '__main__':
 
     wins = 0
     scores = []
-    num_games = 100
+    num_games = 1
     for i in tqdm.tqdm(range(num_games)):
         won, score = player.play(Game())
         if won:

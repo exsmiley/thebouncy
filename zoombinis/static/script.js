@@ -31,7 +31,7 @@ function handleClickZ(element) {
     if(!gameOver) {
         isClicking = true;
         let index = element.id;
-        myCurrentZ = myZ[index[1]];
+        myCurrentZ = myZ[index.slice(1)];
         if(!myCurrentZ.has_passed) {
             $('#z'+myCurrentZ.id).css('border', 'dashed')
             $('#buttons').append('<button type="button" class="btn btn-primary" id="top" onClick="send(this)">Top</button><button type="button" class="btn btn-danger" id="bottom" onClick="send(this)">Bottom</button>');

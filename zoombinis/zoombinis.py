@@ -4,8 +4,8 @@ import itertools
 import functools
 
 
-NUM_ZOOMBINIS = 16
-MAX_MISTAKES = 6
+NUM_ZOOMBINIS = 10
+MAX_MISTAKES = 5
 NUM_BRIDGES = 2
 
 ZOOMBINI_AGENT_VECTOR_LENGTH = 5*4 + 2*NUM_BRIDGES
@@ -108,10 +108,10 @@ class Bridge(object):
         # generate the condition
         self.attr = random.choice(['hair', 'eyes', 'nose', 'feet'])
         self.attr_num = random.randint(0, 5)
-        self.top_true = random.randint(0, 1)
+        self.bridge = random.randint(0, 1)
 
 
-    def check_pass(self, zoombini, top):
+    def check_pass(self, zoombini, bridge):
         '''returns true if the zoombini can cross the bridge
 
         Args:
@@ -119,7 +119,7 @@ class Bridge(object):
             top: boolean saying if it's trying to go top
         '''
         satisfies = getattr(zoombini, self.attr) == self.attr_num
-        return (satisfies and self.top_true == top) or (not satisfies and self.top_true != top)
+        return (satisfies and self.bridge == bridge) or (not satisfies and self.bridge != bridge)
 
     def zoombini_bridge(self, zoombini):
         for i in range(NUM_BRIDGES):
@@ -127,7 +127,7 @@ class Bridge(object):
                 return i
 
     def __str__(self):
-        bridge_spot = 'Top' if self.top_true else 'Bottom'
+        bridge_spot = 'Top' if self.bridge == 0 else 'Bottom'
         return 'Bridge Condition: {} bridge says only {} num {}'.format(bridge_spot, self.attr, self.attr_num)
 
 
@@ -153,6 +153,7 @@ class Game(object):
             self.bridge = Bridge()
 
     def send_zoombini(self, index, top):
+        # print('sending', index, top)
         top = 1 if top else 0
         zoombini = self.zoombinis[index]
         if self.bridge.check_pass(zoombini, top) and not zoombini.has_passed:
@@ -166,7 +167,7 @@ class Game(object):
             self.mistakes += 1
             zoombini.rejected_bridges.append(top)
         did_pass = 'passed' if zoombini.has_passed else 'failed'
-        # print('sending {} to {} and it {}'.format(index, top, did_pass))
+        print('sending {} to {} and it {}'.format(index, top, did_pass))
 
         return zoombini.has_passed
 
