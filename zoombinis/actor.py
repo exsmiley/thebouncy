@@ -6,7 +6,7 @@ import traceback
 from itertools import count
 from collections import namedtuple
 from zoombinis import *
-from brain import EntropyRewardOracle
+from brain import EntropyRewardOracle, Brain
 
 import torch
 import torch.nn as nn
@@ -17,6 +17,7 @@ from torch.distributions import Categorical
 np.set_printoptions(suppress=True)
 
 USE_SHAPER = False
+PIPELINE = True
 
 GAMMA = 0.99
 SEED = 543
@@ -28,10 +29,12 @@ SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
 
 class Policy(nn.Module):
-    def __init__(self):
+    def __init__(self, pipeline=False):
         super(Policy, self).__init__()
         # input_length = 4
         input_length = AGENT_INPUT_LENGTH
+        if pipeline:
+            input_length = OUTPUT_LENGTH
         layer_size = 128
         # layer_size = 1000
         self.affine1 = nn.Linear(input_length, layer_size)
@@ -68,12 +71,13 @@ class Policy(nn.Module):
         # zeros out any unavailable options and rebalances to make sum to 1
         state = torch.from_numpy(state).float()
         probs, state_value = self.forward(Variable(state))
+
         m = Categorical(probs)
-        action = m.sample()
+        # action = m.sample()
 
         probs2 = probs.data.numpy()
         for ind in invalid_moves:
-            probs2[ind] = 0
+            probs2[ind] = 1e-30
         probs2 = probs2 / np.sum(probs2)
         action = np.random.choice(len(probs2), p=probs2)
         action = Variable(torch.from_numpy(np.array([action])))
@@ -95,8 +99,8 @@ def finish_episode(model, optimizer):
     rewards = torch.Tensor(rewards)
     rewards = (rewards - rewards.mean()) / (rewards.std() + np.finfo(np.float32).eps)
     for (log_prob, value), r in zip(saved_actions, rewards):
-        reward = r - value.data[0]
-        policy_losses.append(-log_prob * reward)
+        advantage = r - value.data[0]
+        policy_losses.append(-log_prob * advantage)
         value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([r]))))
     optimizer.zero_grad()
     loss = torch.stack(policy_losses).sum() + torch.stack(value_losses).sum()
@@ -113,16 +117,23 @@ def main(model, running_reward_list):
 
     if USE_SHAPER:
         reward_shaper = EntropyRewardOracle()
+    if PIPELINE:
+        brain = Brain('models/brain')
 
     running_reward = 1
 
     for i_episode in count(1):
         state = env.reset()
         total_reward = 0
-        made_actions = set()
-        for t in range(10000):  # Don't infinite loop while learning
+        made_actions = []
+        for t in range(100):  # Don't infinite loop while learning
             invalid_moves = env.get_invalid_moves()
-            action = model.select_action2(state, invalid_moves)
+
+            if PIPELINE:
+                state = np.array(brain.get_probabilities_total(env.game.get_brain_state(), env.game.known))
+
+            action = model.select_action2(state, invalid_moves+made_actions)
+            made_actions.append(action)
 
             if USE_SHAPER:
                 state, reward, done, additional = env.step(action, reward_shaper=reward_shaper)
@@ -133,7 +144,7 @@ def main(model, running_reward_list):
             total_reward += reward
             model.rewards.append(reward+additional)
             if done:
-                made_actions = set()
+                made_actions = []
                 break
         if i_episode == 0:
             running_reward = running_reward
@@ -155,35 +166,105 @@ class ActorPlayer(object):
 
     def __init__(self):
         self.policy = Policy()
+        self.brain = Brain(chkpt='models/brain')
         self.policy.load()
 
     def play(self, game):
         # print(game)
         # print(game.truth)
-        score = 0
+        truth = game.get_brain_truth()
+        scores = []
+        actual_score = 0
+        moved = []
         while game.can_move():
-            invalid_moves = game.get_invalid_moves()
+            invalid_moves = game.get_invalid_moves() + moved
             state = np.array(game.get_agent_state())
             action = self.policy.select_action2(state, invalid_moves)
+            moved.append(action)
+
+            state = game.get_brain_state()
+            probs = self.brain.get_probabilities(state)
+            score = 0
+
+            for i in range(0, len(truth), NUM_BRIDGES):
+                truths = truth[i:i+NUM_BRIDGES]
+                preds = probs[i:i+NUM_BRIDGES]
+                if np.argmax(truths) == np.argmax(preds):
+                    score += 1
+
+            scores.append(score)
 
             zoombini = action//NUM_BRIDGES
             bridge = action % NUM_BRIDGES
             passed = game.send_zoombini(zoombini, bridge)
             if passed:
-                score += 1
+                actual_score += 1
 
-        return game.has_won(), score
+        return game.has_won(), scores, actual_score
+
+class ActorShapedPlayer(ActorPlayer):
+
+    def __init__(self):
+        self.policy = Policy()
+        self.brain = Brain(chkpt='models/brain')
+        self.policy.load('models/actor_shaped')
+
+class ActorPipelinePlayer(ActorPlayer):
+
+    def __init__(self):
+        self.policy = Policy(pipeline=True)
+        self.brain = Brain(chkpt='models/brain')
+        self.policy.load('models/actor_pipeline')
+
+    def play(self, game):
+        # print(game)
+        # print(game.truth)
+        truth = game.get_brain_truth()
+        scores = []
+        actual_score = 0
+        moved = []
+        while game.can_move():
+            invalid_moves = game.get_invalid_moves() + moved
+            state = np.array(self.brain.get_probabilities_total(game.get_brain_state(), game.known))
+            action = self.policy.select_action2(state, invalid_moves)
+            moved.append(action)
+
+            state = game.get_brain_state()
+            probs = self.brain.get_probabilities(state)
+            score = 0
+
+            for i in range(0, len(truth), NUM_BRIDGES):
+                truths = truth[i:i+NUM_BRIDGES]
+                preds = probs[i:i+NUM_BRIDGES]
+                if np.argmax(truths) == np.argmax(preds):
+                    score += 1
+
+            scores.append(score)
+
+            zoombini = action//NUM_BRIDGES
+            bridge = action % NUM_BRIDGES
+            passed = game.send_zoombini(zoombini, bridge)
+            if passed:
+                actual_score += 1
+
+        return game.has_won(), scores, actual_score
 
 
 if __name__ == '__main__':
     try:
-        model = Policy()
+        model = Policy(pipeline=PIPELINE)
         running_reward_list = []
         main(model, running_reward_list)
     except:
         traceback.print_exc()
     finally:
-        model.save()
+        if USE_SHAPER:
+            model.save('models/actor_shaped')
+        elif PIPELINE:
+            model.save('models/actor_pipeline')
+        else:
+            model.save()
         import matplotlib.pyplot as plt
         plt.plot(running_reward_list)
         plt.show()
+

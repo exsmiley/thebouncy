@@ -4,8 +4,8 @@ import itertools
 import functools
 
 
-NUM_ZOOMBINIS = 10
-MAX_MISTAKES = 5
+NUM_ZOOMBINIS = 16
+MAX_MISTAKES = 6
 NUM_BRIDGES = 2
 
 ZOOMBINI_AGENT_VECTOR_LENGTH = 5*4 + 2*NUM_BRIDGES
@@ -105,10 +105,22 @@ def sort_zoombinis(zoombinis):
 class Bridge(object):
 
     def __init__(self):
-        # generate the condition
-        self.attr = random.choice(['hair', 'eyes', 'nose', 'feet'])
-        self.attr_num = random.randint(0, 5)
-        self.bridge = random.randint(0, 1)
+        # generate the conditions
+        self.else_bridge = random.randint(0, NUM_BRIDGES-1)
+        conds = set()
+        self.bridges = {}
+        for i in range(NUM_BRIDGES):
+            if i != self.else_bridge:
+                cond = self.gen_condition()
+                while str(cond) in conds:
+                    cond = self.gen_condition()
+                self.bridges[i] = cond
+                conds.add(str(cond))
+
+    def gen_condition(self):
+        attr = random.choice(['hair', 'eyes', 'nose', 'feet'])
+        num = random.randint(0, 5)
+        return {'attr': attr, 'num': num}
 
 
     def check_pass(self, zoombini, bridge):
@@ -118,8 +130,22 @@ class Bridge(object):
             zoombini: Zoombini instance
             top: boolean saying if it's trying to go top
         '''
-        satisfies = getattr(zoombini, self.attr) == self.attr_num
-        return (satisfies and self.bridge == bridge) or (not satisfies and self.bridge != bridge)
+        if bridge == self.else_bridge:
+            # iterate through all and check
+            for i in range(NUM_BRIDGES):
+                if i == self.else_bridge:
+                    continue
+                attr = self.bridges[i]['attr']
+                num = self.bridges[i]['num']
+                if getattr(zoombini, attr) == num:
+                    return False
+            return True
+        else:
+            # only need to check one
+            attr = self.bridges[bridge]['attr']
+            num = self.bridges[bridge]['num']
+            return getattr(zoombini, attr) == num
+
 
     def zoombini_bridge(self, zoombini):
         for i in range(NUM_BRIDGES):
@@ -127,8 +153,7 @@ class Bridge(object):
                 return i
 
     def __str__(self):
-        bridge_spot = 'Top' if self.bridge == 0 else 'Bottom'
-        return 'Bridge Condition: {} bridge says only {} num {}'.format(bridge_spot, self.attr, self.attr_num)
+        return 'Bridges: {} Else: {}'.format(self.bridges, self.else_bridge)
 
 
 class Game(object):
@@ -142,9 +167,16 @@ class Game(object):
             # self.zoombinis = [Zoombini() for _ in range(NUM_ZOOMBINIS)]
             self.zoombinis = sort_zoombinis([Zoombini() for _ in range(NUM_ZOOMBINIS)])
 
+        # bridge = Bridge()
+        # bridge.attr = 'hair'
+        # bridge.attr_num = 1
+        # bridge.bridge = 0
+
         self.new_game(bridge)
         self.truth = list(map(lambda z: self.bridge.zoombini_bridge(z), self.zoombinis))
         self.mistakes = 0
+        self.known = {}
+        # print(self.truth)
 
     def new_game(self, bridge=None):
         if bridge:
@@ -167,7 +199,8 @@ class Game(object):
             self.mistakes += 1
             zoombini.rejected_bridges.append(top)
         did_pass = 'passed' if zoombini.has_passed else 'failed'
-        print('sending {} to {} and it {}'.format(index, top, did_pass))
+        self.known[(index, top)] = zoombini.has_passed
+        # print('sending {} to {} and it {}'.format(index, top, did_pass))
 
         return zoombini.has_passed
 
@@ -193,7 +226,11 @@ class Game(object):
         return vec
 
     def get_brain_truth(self):
-        return self.truth
+        vecs = [0 for _ in range(len(self.truth)*NUM_BRIDGES)]
+        for i, t in enumerate(self.truth):
+            vecs[NUM_BRIDGES*i+t] = 1
+        # return self.truth
+        return vecs
 
     def reset(self):
         self.mistakes = 0
@@ -204,8 +241,8 @@ class Game(object):
         inds = []
         for i in range(len(self.zoombinis)):
             if self.zoombinis[i].has_passed:
-                inds.append(2*i)
-                inds.append(2*i+1)
+                for j in range(NUM_BRIDGES):
+                    inds.append(NUM_BRIDGES*i+j)
         return inds
 
     def zoombinis_json(self):
