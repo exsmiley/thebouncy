@@ -174,6 +174,7 @@ class ActorPlayer(object):
         # print(game.truth)
         truth = game.get_brain_truth()
         scores = []
+        running_scores = []
         actual_score = 0
         moved = []
         while game.can_move():
@@ -199,8 +200,9 @@ class ActorPlayer(object):
             passed = game.send_zoombini(zoombini, bridge)
             if passed:
                 actual_score += 1
+            running_scores.append(actual_score)
 
-        return game.has_won(), scores, actual_score
+        return game.has_won(), scores, actual_score, running_scores
 
 class ActorShapedPlayer(ActorPlayer):
 
@@ -221,6 +223,7 @@ class ActorPipelinePlayer(ActorPlayer):
         # print(game.truth)
         truth = game.get_brain_truth()
         scores = []
+        running_scores = []
         actual_score = 0
         moved = []
         while game.can_move():
@@ -247,7 +250,9 @@ class ActorPipelinePlayer(ActorPlayer):
             if passed:
                 actual_score += 1
 
-        return game.has_won(), scores, actual_score
+            running_scores.append(actual_score)
+
+        return game.has_won(), scores, actual_score, running_scores
 
 
 if __name__ == '__main__':

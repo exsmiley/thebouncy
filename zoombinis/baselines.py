@@ -53,6 +53,7 @@ class MaxEntropyPlayer(object):
 
     def play(self, game):
         actual_score = 0
+        running_scores = []
         scores = []
         moves = 0
         truth = game.get_brain_truth()
@@ -110,8 +111,9 @@ class MaxEntropyPlayer(object):
 
             if feedback:
                 actual_score += 1
+            running_scores.append(actual_score)
 
-        return game.has_won(), scores, actual_score
+        return game.has_won(), scores, actual_score, running_scores
 
 class MaxProbabilityPlayer(MaxEntropyPlayer):
 
@@ -129,6 +131,7 @@ class RandomPlayer():
         possible_moves = set([i for i in range(NUM_ZOOMBINIS*2)])
         next_move = None
         scores = []
+        running_scores = []
         moves = 0
         actual_score = 0
         truth = game.get_brain_truth()
@@ -161,7 +164,9 @@ class RandomPlayer():
 
             if result:
                 actual_score += 1
-        return game.has_won(), scores, actual_score
+
+            running_scores.append(actual_score)
+        return game.has_won(), scores, actual_score, running_scores
 
 
 class RandomFlipFlop():
@@ -175,6 +180,7 @@ class RandomFlipFlop():
         possible_moves = set([i for i in range(NUM_ZOOMBINIS*2)])
         next_move = None
         scores = []
+        running_scores = []
         moves = 0
         actual_score = 0
         truth = game.get_brain_truth()
@@ -214,8 +220,9 @@ class RandomFlipFlop():
                 next_move = action - 1
             else:
                 actual_score += 1
+            running_scores.append(actual_score)
 
-        return game.has_won(), scores, actual_score
+        return game.has_won(), scores, actual_score, running_scores
 
 
 if __name__ == '__main__':

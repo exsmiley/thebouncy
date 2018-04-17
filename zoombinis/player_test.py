@@ -8,50 +8,69 @@ num_games = 1000
 
 players = [MaxProbabilityPlayer(), MaxEntropyPlayer(), ActorPlayer(), ActorShapedPlayer(), ActorPipelinePlayer(), RandomFlipFlop(), RandomPlayer()]
 wins = [0 for i in range(len(players))]
+entropy_scores = [[] for i in range(len(players))]
 scores = [[] for i in range(len(players))]
-actual_scores = [[] for i in range(len(players))]
+running_scores = [[] for i in range(len(players))]
 
 for i in tqdm.tqdm(range(num_games)):
     game = Game()
     for j, player in enumerate(players):
         game.reset()
-        # print(game)
-        won, score, actual_score = player.play(game)
+        won, entropy_score, score, running_score = player.play(game)
         if won:
             wins[j] += 1
+        entropy_scores[j].append(entropy_score)
         scores[j].append(score)
-        actual_scores[j].append(actual_score)
-        # print('total mistakes:', game.mistakes)
+        running_scores[j].append(running_score)
 
 all_score_sums = []
+running_scores2 = []
 
 for i in range(len(players)):
     print(players[i].__class__.__name__)
     print('win rate:', wins[i]/num_games)
-    # print(actual_scores[i])
-    print('avg score:', sum(actual_scores[i])/num_games)
+    # print(scores[i])
+    print('avg score:', sum(scores[i])/num_games)
     score_sums = []
+    running_sums = []
     for j in range(NUM_ZOOMBINIS+MAX_MISTAKES):
         score_sum = 0
+        running_sum = 0
         num = 0
-        for score in scores[i]:
+        for score in entropy_scores[i]:
             if j < len(score):
                 score_sum += score[j]
                 num += 1
+
+        for score in running_scores[i]:
+            if j < len(score):
+                running_sum += score[j]
+            else:
+                running_sum += score[-1]
+
         if num > 0:
             # print('avg entropy score at {} steps: {}'.format(j+1, score_sum/num))
             score_sums.append(score_sum/num)
         else:
-            score_sums.append(score_sums[-1])
+            pass
+        running_sums.append(running_sum/len(entropy_scores[i]))
     print()
     all_score_sums.append(score_sums)
+    running_scores2.append(running_sums)
 
 import matplotlib.pyplot as plt
 
 
-x = list(range(NUM_ZOOMBINIS+MAX_MISTAKES))
 for i, y in enumerate(all_score_sums):
-    plt.plot(x, y)
+    plt.plot(list(range(len(y))), y)
 
+plt.title('Entropy Scores')
+plt.legend([players[i].__class__.__name__ for i in range(len(players))])
+plt.show()
+
+for i, y in enumerate(running_scores2):
+    plt.plot(list(range(len(y))), y)
+
+plt.title('Total Scores')
 plt.legend([players[i].__class__.__name__ for i in range(len(players))])
 plt.show()
