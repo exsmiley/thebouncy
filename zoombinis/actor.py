@@ -17,7 +17,7 @@ from torch.distributions import Categorical
 np.set_printoptions(suppress=True)
 
 USE_SHAPER = False
-PIPELINE = True
+PIPELINE = False
 
 GAMMA = 0.99
 SEED = 543
@@ -253,6 +253,50 @@ class ActorPipelinePlayer(ActorPlayer):
             running_scores.append(actual_score)
 
         return game.has_won(), scores, actual_score, running_scores
+
+
+class ActorPipelinePlayer2(ActorPlayer):
+
+    def __init__(self):
+        self.policy = Policy(pipeline=True)
+        self.brain = Brain(chkpt='models/brain_pipelined')
+        self.entropy_brain = Brain(chkpt='models/brain')
+        self.policy.load('models/actor_pipelined2')
+
+    def play(self, game):
+        truth = game.get_brain_truth()
+        scores = []
+        running_scores = []
+        actual_score = 0
+        moved = []
+        while game.can_move():
+            invalid_moves = game.get_invalid_moves() + moved
+            state = np.array(self.brain.get_probabilities_total(game.get_brain_state(), game.known))
+            action = self.policy.select_action2(state, invalid_moves)
+            moved.append(action)
+
+            state = game.get_brain_state()
+            probs = self.entropy_brain.get_probabilities(state)
+            score = 0
+
+            for i in range(0, len(truth), NUM_BRIDGES):
+                truths = truth[i:i+NUM_BRIDGES]
+                preds = probs[i:i+NUM_BRIDGES]
+                if np.argmax(truths) == np.argmax(preds):
+                    score += 1
+
+            scores.append(score)
+
+            zoombini = action//NUM_BRIDGES
+            bridge = action % NUM_BRIDGES
+            passed = game.send_zoombini(zoombini, bridge)
+            if passed:
+                actual_score += 1
+
+            running_scores.append(actual_score)
+
+        return game.has_won(), scores, actual_score, running_scores
+
 
 
 if __name__ == '__main__':

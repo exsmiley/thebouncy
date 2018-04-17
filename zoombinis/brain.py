@@ -102,6 +102,7 @@ class BrainTrainer(object):
         self.model = Brain(chkpt=chkpt)
         self.optimizer = optim.Adam(self.model.parameters(), lr=LEARNING_RATE)
         self.criterion = nn.BCELoss()
+        self.chkpt_name = 'models/brain'
 
         self.state_buffer = []
         self.feedback_buffer = []
@@ -117,7 +118,7 @@ class BrainTrainer(object):
                 print('Episode {}...'.format(i+1))
                 self.train()
 
-        self.model.save()
+        self.model.save(self.chkpt_name)
 
     def train(self):
         all_indices = [i for i in range(len(self.state_buffer))]

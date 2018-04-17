@@ -6,7 +6,8 @@ import tqdm
 
 num_games = 1000
 
-players = [MaxProbabilityPlayer(), MaxEntropyPlayer(), ActorPlayer(), ActorShapedPlayer(), ActorPipelinePlayer(), RandomFlipFlop(), RandomPlayer()]
+# players = [ActorPipelinePlayer(), ]
+players = [MaxProbabilityPlayer(), MaxEntropyPlayer(), ActorPlayer(), ActorShapedPlayer(), ActorPipelinePlayer(), ActorPipelinePlayer2(), RandomFlipFlop(), RandomPlayer()]
 wins = [0 for i in range(len(players))]
 entropy_scores = [[] for i in range(len(players))]
 scores = [[] for i in range(len(players))]
