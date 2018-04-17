@@ -74,3 +74,9 @@ for i, y in enumerate(running_scores2):
 plt.title('Total Scores')
 plt.legend([players[i].__class__.__name__ for i in range(len(players))])
 plt.show()
+
+plt.gcf().subplots_adjust(left=0.3)
+plt.title('Distribution of Scores')
+plt.boxplot(scores, vert=False, labels=[players[i].__class__.__name__ for i in range(len(players))])
+
+plt.show()
