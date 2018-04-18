@@ -68,6 +68,7 @@ class Brain(nn.Module):
     def get_probabilities_total(self, state, known):
         state2 = Variable(torch.FloatTensor(state).view(-1, BRAIN_INPUT_LENGTH))
         vecs = self.forward(state2).data.numpy()[0]
+        new_vecs = np.zeros(NUM_ZOOMBINIS*(NUM_BRIDGES+1))
 
         # make certain ones that we know
         for k, v in known.items():
@@ -84,6 +85,19 @@ class Brain(nn.Module):
                 total += vecs[j]
             for j in range(i, i+NUM_BRIDGES):
                 vecs[j] /= total
+
+        vec_count = 0
+        z_count = 0
+        for i in range(len(new_vecs)):
+            if (i+1) % (NUM_BRIDGES+1) == 0:
+                if z_count in known:
+                    new_vecs[i] = 1
+                z_count += 1
+            else:
+                new_vecs[i] = vecs[vec_count]
+                vec_count += 1
+
+        vecs = np.array(new_vecs)
 
         return list(vecs)
 

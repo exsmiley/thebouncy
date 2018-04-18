@@ -1,6 +1,7 @@
 from brain import *
 from actor import *
 from baselines import *
+import matplotlib.pyplot as plt
 
 
 class ActorTrainer(BrainTrainer):
@@ -35,8 +36,8 @@ class EntropyTrainer(BrainTrainer):
 
     def __init__(self, chkpt='models/brain'):
         super(EntropyTrainer, self).__init__(chkpt=chkpt)
-        self.player = EntropyPlayer()
-        # self.brain = Brain()
+        self.player = MaxEntropyPlayer()
+        self.brain = Brain()
         self.player.brain = self.brain
 
     def play_game(self):
@@ -95,6 +96,8 @@ class PipelineTrainer(BrainTrainer):
     def run(self):
         super(PipelineTrainer, self).run()
         self.policy.save('models/actor_pipelined2')
+        plt.plot(self.running_reward_list)
+        plt.show()
 
 if __name__ == '__main__':
     trainer = PipelineTrainer()
