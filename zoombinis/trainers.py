@@ -34,8 +34,9 @@ class ActorTrainer(BrainTrainer):
 
 class EntropyTrainer(BrainTrainer):
 
-    def __init__(self, chkpt='models/brain'):
-        super(EntropyTrainer, self).__init__(chkpt=chkpt)
+    def __init__(self):
+        super(EntropyTrainer, self).__init__()
+        self.chkpt_name = 'models/brain_entropy'
         self.player = MaxEntropyPlayer()
         self.brain = Brain()
         self.player.brain = self.brain
@@ -65,21 +66,28 @@ class PipelineTrainer(BrainTrainer):
         states = []
         feedbacks = []
         for t in range(100):  # Don't infinite loop while learning
-            invalid_moves = self.env.get_invalid_moves()
+            # invalid_moves = self.env.get_invalid_moves()
 
             state = np.array(self.model.get_probabilities_total(self.env.game.get_brain_state(), self.env.game.known))
 
-            action = self.policy.select_action2(state, invalid_moves+made_actions)
+            action = self.policy.select_action(state)#, invalid_moves+made_actions)
             made_actions.append(action)
 
             state, reward, done = self.env.step(action)
 
             total_reward += reward
+
+            if reward <= 0:
+                reward = -1
+
+            if done and not self.env.game.has_won():
+                reward = -100
+
             self.policy.rewards.append(reward)
             states.append(self.env.game.get_brain_state())
             feedbacks.append(truth)
             if done:
-                made_actions = []
+                # made_actions = []
                 break
         if self.i_episode == 0:
             self.running_reward = running_reward
