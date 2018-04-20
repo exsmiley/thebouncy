@@ -17,7 +17,7 @@ from torch.distributions import Categorical
 np.set_printoptions(suppress=True)
 
 USE_SHAPER = False
-PIPELINE = False
+PIPELINE = True
 
 GAMMA = 0.99
 SEED = 543
@@ -34,7 +34,7 @@ class Policy(nn.Module):
         # input_length = 4
         input_length = AGENT_INPUT_LENGTH
         if pipeline:
-            input_length = OUTPUT_LENGTH
+            input_length = NUM_ZOOMBINIS*(NUM_BRIDGES+1)#OUTPUT_LENGTH
         layer_size = 128
         # layer_size = 1000
         self.affine1 = nn.Linear(input_length, layer_size)
@@ -43,6 +43,7 @@ class Policy(nn.Module):
 
         self.saved_actions = []
         self.rewards = []
+        self.probs_list = []
 
     def forward(self, x):
         x = F.relu(self.affine1(x))
@@ -71,18 +72,34 @@ class Policy(nn.Module):
         # zeros out any unavailable options and rebalances to make sum to 1
         state = torch.from_numpy(state).float()
         probs, state_value = self.forward(Variable(state))
-
+        # print(invalid_moves)
+        # print(probs)
         m = Categorical(probs)
-        # action = m.sample()
+        # action = m.sample()/
 
-        probs2 = probs.data.numpy()
+        probs2 = np.copy(probs.data.numpy())
+        # if np.isnan(np.min(probs2)):
+        #     print(self.probs_list)
+        #     print(probs2, 'probs2')
+        #     print(probs.data.numpy(), 'probs')
+        #     quit()
+        # probs2 = np.nan_to_num(probs2)+1e-20
+        invalid_moves2 = set(invalid_moves)
         for ind in invalid_moves:
             probs2[ind] = 1e-30
+
+        # for i in range(len(probs2)):
+        #     if i in invalid_moves2:
+        #         continue
+        #     probs2[i] = max(np.nan_to_num(probs2[i]), 1e-25)
         probs2 = probs2 / np.sum(probs2)
         action = np.random.choice(len(probs2), p=probs2)
         action = Variable(torch.from_numpy(np.array([action])))
         # print(probs2, action)
         # print(probs2)
+        # if len(self.probs_list) > 10:
+        #     self.probs_list.pop(0)
+        self.probs_list.append((probs.data.numpy(), invalid_moves))
         
         self.saved_actions.append(SavedAction(m.log_prob(action), state_value))
         return action.data[0]
@@ -125,15 +142,16 @@ def main(model, running_reward_list):
     for i_episode in count(1):
         state = env.reset()
         total_reward = 0
-        made_actions = []
-        for t in range(100):  # Don't infinite loop while learning
-            invalid_moves = env.get_invalid_moves()
+        # made_actions = set()
+        for t in range(30):  # Don't infinite loop while learning
+            # invalid_moves = env.get_invalid_moves()
 
             if PIPELINE:
                 state = np.array(brain.get_probabilities_total(env.game.get_brain_state(), env.game.known))
+                # state = np.array(env.game.get_brain_truth())
 
-            action = model.select_action2(state, invalid_moves+made_actions)
-            made_actions.append(action)
+            action = model.select_action(state)#, invalid_moves+list(made_actions))
+            # made_actions.add(action)
 
             if USE_SHAPER:
                 state, reward, done, additional = env.step(action, reward_shaper=reward_shaper)
@@ -142,10 +160,18 @@ def main(model, running_reward_list):
                 additional = 0
 
             total_reward += reward
+
+            if reward <= 0:
+                reward = -1
+
+            if done and not env.game.has_won():
+                reward = -100
+
             model.rewards.append(reward+additional)
             if done:
-                made_actions = []
+                # made_actions = []
                 break
+
         if i_episode == 0:
             running_reward = running_reward
         else:
@@ -165,7 +191,7 @@ def main(model, running_reward_list):
 class ActorPlayer(object):
 
     def __init__(self):
-        self.policy = Policy()
+        self.policy = Policy(pipeline=False)
         self.brain = Brain(chkpt='models/brain')
         self.policy.load()
 
@@ -203,6 +229,35 @@ class ActorPlayer(object):
             running_scores.append(actual_score)
 
         return game.has_won(), scores, actual_score, running_scores
+
+    def brain_test(self, game, brains):
+        scores_dict = {brain: [] for brain in brains.keys()}
+        truth = game.get_brain_truth()
+        moved = []
+        while game.can_move():
+            invalid_moves = game.get_invalid_moves() + moved
+            state = np.array(game.get_agent_state())
+            action = self.policy.select_action2(state, invalid_moves)
+            moved.append(action)
+
+            state2 = game.get_brain_state()
+            for brain, scores in scores_dict.items():
+                brain = brains[brain]
+                probs = brain.get_probabilities(state2)
+                score = 0
+
+                for i in range(0, len(truth), NUM_BRIDGES):
+                    truths = truth[i:i+NUM_BRIDGES]
+                    preds = probs[i:i+NUM_BRIDGES]
+                    if np.argmax(truths) == np.argmax(preds):
+                        score += 1
+                scores.append(score)
+
+            zoombini = action//NUM_BRIDGES
+            bridge = action % NUM_BRIDGES
+            passed = game.send_zoombini(zoombini, bridge)
+
+        return scores_dict
 
 class ActorShapedPlayer(ActorPlayer):
 
@@ -254,6 +309,35 @@ class ActorPipelinePlayer(ActorPlayer):
 
         return game.has_won(), scores, actual_score, running_scores
 
+    def brain_test(self, game, brains):
+        scores_dict = {brain: [] for brain in brains.keys()}
+        truth = game.get_brain_truth()
+        moved = []
+        while game.can_move():
+            invalid_moves = game.get_invalid_moves() + moved
+            state = np.array(self.brain.get_probabilities_total(game.get_brain_state(), game.known))
+            action = self.policy.select_action2(state, invalid_moves)
+            moved.append(action)
+
+            state2 = game.get_brain_state()
+            for brain, scores in scores_dict.items():
+                brain = brains[brain]
+                probs = brain.get_probabilities(state2)
+                score = 0
+
+                for i in range(0, len(truth), NUM_BRIDGES):
+                    truths = truth[i:i+NUM_BRIDGES]
+                    preds = probs[i:i+NUM_BRIDGES]
+                    if np.argmax(truths) == np.argmax(preds):
+                        score += 1
+                scores.append(score)
+
+            zoombini = action//NUM_BRIDGES
+            bridge = action % NUM_BRIDGES
+            passed = game.send_zoombini(zoombini, bridge)
+
+        return scores_dict
+
 
 class ActorPipelinePlayer2(ActorPlayer):
 
@@ -296,6 +380,35 @@ class ActorPipelinePlayer2(ActorPlayer):
             running_scores.append(actual_score)
 
         return game.has_won(), scores, actual_score, running_scores
+
+    def brain_test(self, game, brains):
+        scores_dict = {brain: [] for brain in brains.keys()}
+        truth = game.get_brain_truth()
+        moved = []
+        while game.can_move():
+            invalid_moves = game.get_invalid_moves() + moved
+            state = np.array(self.brain.get_probabilities_total(game.get_brain_state(), game.known))
+            action = self.policy.select_action2(state, invalid_moves)
+            moved.append(action)
+
+            state2 = game.get_brain_state()
+            for brain, scores in scores_dict.items():
+                brain = brains[brain]
+                probs = brain.get_probabilities(state2)
+                score = 0
+
+                for i in range(0, len(truth), NUM_BRIDGES):
+                    truths = truth[i:i+NUM_BRIDGES]
+                    preds = probs[i:i+NUM_BRIDGES]
+                    if np.argmax(truths) == np.argmax(preds):
+                        score += 1
+                scores.append(score)
+
+            zoombini = action//NUM_BRIDGES
+            bridge = action % NUM_BRIDGES
+            passed = game.send_zoombini(zoombini, bridge)
+
+        return scores_dict
 
 
 

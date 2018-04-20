@@ -12,6 +12,65 @@ class MaxEntropyPlayer(object):
         # brain that starts with random to just compare with random
         # self.brain = Brain()
 
+    def brain_test(self, game, brains):
+        scores_dict = {brain: [] for brain in brains.keys()}
+        moves = 0
+        truth = game.get_brain_truth()
+        indices_remaining = [i for i in range(NUM_BRIDGES*NUM_ZOOMBINIS)]
+        tried = {} # maps indices to previously tried boolean values
+
+        while game.can_move():
+            moves += 1
+            best_entropy = -1
+            best_entropy_i = -1
+            best_prob = -1
+            best_prob_i = -1
+
+            state = game.get_brain_state()
+            entropies = self.brain.get_entropies(state)
+            probs = self.brain.get_probabilities(state)
+
+            for brain, scores in scores_dict.items():
+                brain = brains[brain]
+                probs = brain.get_probabilities(state)
+                score = 0
+
+                for i in range(0, len(truth), NUM_BRIDGES):
+                    truths = truth[i:i+NUM_BRIDGES]
+                    preds = probs[i:i+NUM_BRIDGES]
+                    if np.argmax(truths) == np.argmax(preds):
+                        score += 1
+                scores.append(score)
+
+
+            for i in indices_remaining:
+                
+                entropy = entropies[i]
+                prob = probs[i]
+
+                if entropy > best_entropy:
+                    best_entropy_i = i
+                    best_entropy = entropy
+
+                if prob > best_prob:
+                    best_prob_i = i
+                    best_prob = prob
+
+
+            if best_prob > self.prob_value:
+                index = best_prob_i
+            else:
+                index = best_entropy_i
+
+            indices_remaining.remove(index)
+
+            zoombini = index//NUM_BRIDGES
+            bridge = index % NUM_BRIDGES
+
+            feedback = game.send_zoombini(zoombini, bridge)
+
+        return scores_dict
+
     def play_game_trainer(self):
         game = Game()
         truth = game.get_brain_truth()
