@@ -1,5 +1,5 @@
 import numpy as np
-import random
+from utils import *
 
 # length of board
 L = 10
@@ -95,34 +95,16 @@ class GameEnv(object):
     state = mask_board(self.board, self.made_moves)
     return state, reward, done
 
-class RandomActor:
-
-  def __init__(self, possible_actions):
-    self.possible_actions = possible_actions
-
-  def act(self, state):
-    return random.choice(self.possible_actions)
-
-def play_game(env, actor):
-  trace = []
-  s = env.reset()
-  done = False
-
-  while not done:
-    action = actor.act(s)
-    ss, r, done = env.step(action)
-    trace.append( (s, action, ss, r) )
-    s = ss
-
-  return trace
-
 if __name__ == "__main__":
   env = GameEnv()
   r_actor = RandomActor(env.possible_actions)
-  trace = play_game(env, r_actor)
-  print (len(trace))
+  buff = Buffer(10000)
 
-  print (trace[0])
+  for i in range(1000):
+    trace = play_game(env, r_actor)
+    for tr in trace:
+      buff.add(tr)
 
-  print ("JKFJDSKLFSDJLFSD")
-  print (trace[-1])
+    tr_sample = buff.sample()
+    print (tr_sample)
+
