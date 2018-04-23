@@ -104,23 +104,40 @@ def sort_zoombinis(zoombinis):
 
 class Bridge(object):
 
-    def __init__(self):
+    def __init__(self, zoombinis):
         # generate the conditions
         self.else_bridge = random.randint(0, NUM_BRIDGES-1)
         conds = set()
         self.bridges = {}
         for i in range(NUM_BRIDGES):
             if i != self.else_bridge:
-                cond = self.gen_condition()
+                cond = self.gen_condition(zoombinis)
                 while str(cond) in conds:
-                    cond = self.gen_condition()
+                    cond = self.gen_condition(zoombinis)
                 self.bridges[i] = cond
                 conds.add(str(cond))
 
-    def gen_condition(self):
-        attr = random.choice(['hair', 'eyes', 'nose', 'feet'])
-        num = random.randint(0, 5)
-        return {'attr': attr, 'num': num}
+    def gen_condition(self, zoombinis):
+        # attr = random.choice(['hair', 'eyes', 'nose', 'feet'])
+        # num = random.randint(0, 5)
+        # return {'attr': attr, 'num': num}
+        attrs = ['hair', 'eyes', 'nose', 'feet']
+        probs = []
+        vals = []
+        for attr in attrs:
+            counts = [0 for i in range(5)]
+            for z in zoombinis:
+                val = getattr(z, attr)
+                counts[val] += 1
+            counts = np.array(counts) / len(zoombinis)
+            selected_val = np.random.choice(range(5), p=counts)
+            probs.append(counts[selected_val])
+            vals.append(selected_val)
+        
+        probs = np.array(probs) / np.sum(probs)
+
+        attr_num = np.random.choice(len(attrs), p=probs)
+        return {'attr': attrs[attr_num], 'num': vals[attr_num]}
 
 
     def check_pass(self, zoombini, bridge):
@@ -175,6 +192,8 @@ class Game(object):
         self.new_game(bridge)
         self.truth = list(map(lambda z: self.bridge.zoombini_bridge(z), self.zoombinis))
         self.mistakes = 0
+        self.max_steps = 24
+        self.steps = 0
         self.known = {}
         # print(self.truth)
 
@@ -182,13 +201,13 @@ class Game(object):
         if bridge:
             self.bridge = bridge
         else:
-            self.bridge = Bridge()
+            self.bridge = Bridge(self.zoombinis)
 
     def send_zoombini(self, index, top):
-        # print('sending', index, top)
+        self.steps += 1
         top = 1 if top else 0
         zoombini = self.zoombinis[index]
-        if self.bridge.check_pass(zoombini, top) and not zoombini.has_passed:
+        if not zoombini.has_passed and self.bridge.check_pass(zoombini, top):
             zoombini.has_passed = True
             zoombini.accepted_bridge = top
         # can't repeat sending same zoombini
@@ -212,6 +231,7 @@ class Game(object):
         return sum(map(lambda x: x.has_passed, self.zoombinis))
 
     def can_move(self):
+        # return self.steps < self.max_steps and not self.has_won()
         return self.mistakes < MAX_MISTAKES and not self.has_won()
 
     def get_agent_state(self):
@@ -232,8 +252,22 @@ class Game(object):
         # return self.truth
         return vecs
 
+    def get_mask_truth(self):
+        vecs = [0 for _ in range(len(self.truth)*NUM_BRIDGES)]
+        mask = [0 for _ in range(len(self.truth)*NUM_BRIDGES)]
+
+        for (index, top), _ in self.known.items():
+            truth = self.truth[index]
+            vecs[NUM_BRIDGES*index+truth] = 1
+            for i in range(NUM_BRIDGES):
+                mask[NUM_BRIDGES*index+i] = 1
+
+        return vecs, mask
+
     def reset(self):
         self.mistakes = 0
+        self.steps = 0
+        self.known = {}
         for zoombini in self.zoombinis:
             zoombini.reset()
 

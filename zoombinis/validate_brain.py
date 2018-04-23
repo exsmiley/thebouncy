@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 
 num_games = 1000
 
-players = [MaxProbabilityPlayer(), MaxEntropyPlayer(), ActorPlayer(), ActorPipelinePlayer2()]
-brain_names = ['brain', 'brain_pipelined', 'brain_entropy']
+players = [MaxProbabilityPlayer(), MaxEntropyPlayer(), ActorPlayer(), ActorPipelinePlayer()]
+brain_names = ['brain', 'brain_entropy_mask', 'brain_entropy', 'brain_mask']
 brains = {name: Brain('models/'+name) for name in brain_names}
 
 

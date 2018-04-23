@@ -65,7 +65,7 @@ class PipelineTrainer(BrainTrainer):
         made_actions = []
         states = []
         feedbacks = []
-        for t in range(30):  # Don't infinite loop while learning
+        for t in range(31):  # Don't infinite loop while learning
             # invalid_moves = self.env.get_invalid_moves()
 
             state = np.array(self.model.get_probabilities_total(self.env.game.get_brain_state(), self.env.game.known))

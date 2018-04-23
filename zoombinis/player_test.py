@@ -6,7 +6,7 @@ import tqdm
 
 num_games = 1000
 
-players = [ActorPipelinePlayer2(), ActorPipelinePlayer(), MaxProbabilityPlayer(), ActorPlayer(), RandomPlayer(), MaxEntropyPlayer()]
+players = [ActorPipelinePlayer(), MaxProbabilityPlayer(), ActorPlayer(), WinningBridgePlayer(), WinningBridgePlayerNoHack()]
 # players = [MaxProbabilityPlayer(), MaxEntropyPlayer(), ActorPlayer(), ActorShapedPlayer(), ActorPipelinePlayer(), ActorPipelinePlayer2(), RandomFlipFlop(), RandomPlayer()]
 wins = [0 for i in range(len(players))]
 entropy_scores = [[] for i in range(len(players))]
@@ -26,10 +26,12 @@ for i in tqdm.tqdm(range(num_games)):
 
 all_score_sums = []
 running_scores2 = []
+win_rates = []
 
 for i in range(len(players)):
     print(players[i].__class__.__name__)
     print('win rate:', wins[i]/num_games)
+    win_rates.append(wins[i]/num_games)
     # print(scores[i])
     print('avg score:', sum(scores[i])/num_games)
     score_sums = []
@@ -42,7 +44,6 @@ for i in range(len(players)):
             if j < len(score):
                 score_sum += score[j]
                 num += 1
-
         for score in running_scores[i]:
             if j < len(score):
                 running_sum += score[j]
@@ -67,6 +68,11 @@ for i, y in enumerate(all_score_sums):
 
 plt.title('Entropy Scores')
 plt.legend([players[i].__class__.__name__ for i in range(len(players))])
+plt.show()
+
+plt.gcf().subplots_adjust(left=0.3)
+plt.barh([players[i].__class__.__name__ for i in range(len(players))], win_rates)
+plt.title('Win Rates')
 plt.show()
 
 for i, y in enumerate(running_scores2):

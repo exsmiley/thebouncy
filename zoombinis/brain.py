@@ -11,7 +11,7 @@ from torch.autograd import Variable
 
 
 # tunable hyperparameters
-NUM_RUNS = 25000
+NUM_RUNS = 10000
 SAMPLE_SIZE = 20
 LEARNING_RATE = 1e-3
 MOMENTUM = 0.9

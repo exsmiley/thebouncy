@@ -135,7 +135,7 @@ def main(model, running_reward_list):
     if USE_SHAPER:
         reward_shaper = EntropyRewardOracle()
     if PIPELINE:
-        brain = Brain('models/brain')
+        brain = Brain('models/brain_entropy_mask')
 
     running_reward = 1
 
@@ -192,7 +192,7 @@ class ActorPlayer(object):
 
     def __init__(self):
         self.policy = Policy(pipeline=False)
-        self.brain = Brain(chkpt='models/brain')
+        self.brain = Brain(chkpt='models/brain_entropy_mask')
         self.policy.load()
 
     def play(self, game):
@@ -270,8 +270,8 @@ class ActorPipelinePlayer(ActorPlayer):
 
     def __init__(self):
         self.policy = Policy(pipeline=True)
-        self.brain = Brain(chkpt='models/brain')
-        self.policy.load('models/actor_pipeline')
+        self.brain = Brain(chkpt='models/brain_entropy_mask')
+        self.policy.load('models/actor_pipeline_mask')
 
     def play(self, game):
         # print(game)
@@ -423,7 +423,7 @@ if __name__ == '__main__':
         if USE_SHAPER:
             model.save('models/actor_shaped')
         elif PIPELINE:
-            model.save('models/actor_pipeline')
+            model.save('models/actor_pipeline_mask')
         else:
             model.save()
         import matplotlib.pyplot as plt

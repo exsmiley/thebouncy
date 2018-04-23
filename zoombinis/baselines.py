@@ -1,6 +1,7 @@
 from zoombinis import *
 from brain import *
 import numpy as np
+import random
 
 
 class MaxEntropyPlayer(object):
@@ -108,6 +109,40 @@ class MaxEntropyPlayer(object):
             feedbacks.append(truth)
 
         return states, feedbacks
+
+    def play_game_trainer_mask(self):
+        game = Game()
+        indices_remaining = [i for i in range(NUM_BRIDGES*NUM_ZOOMBINIS)]
+
+        states = []
+
+        while game.can_move():
+            best_entropy = -1
+            best_entropy_i = -1
+
+            state = game.get_brain_state()
+            entropies = self.brain.get_entropies(state)
+
+            for i in indices_remaining:
+                entropy = entropies[i]
+
+                if entropy > best_entropy:
+                    best_entropy_i = i
+                    best_entropy = entropy
+
+            index = best_entropy_i
+            indices_remaining.remove(index)
+
+            zoombini = index//NUM_BRIDGES
+            bridge = index % NUM_BRIDGES
+
+            game.send_zoombini(zoombini, bridge)
+
+            brain_state = game.get_brain_state()
+
+            states.append(brain_state)
+
+        return states, game
 
 
     def play(self, game):
@@ -284,21 +319,141 @@ class RandomFlipFlop():
         return game.has_won(), scores, actual_score, running_scores
 
 
+
+class WinningBridgePlayer():
+
+    def __init__(self):
+        self.brain = Brain(chkpt='models/brain')
+
+    def play(self, game):
+        zoombinis = set([i for i in range(NUM_ZOOMBINIS)])
+        next_move = None
+        scores = []
+        running_scores = []
+        moves = 0
+        actual_score = 0
+        truth = game.get_brain_truth()
+
+        old_zoombini = None
+        next_move = None
+        top_count = 1
+        bottom_count = 1
+
+        while game.can_move():
+            moves += 1
+
+            state = game.get_brain_state()
+            probs = self.brain.get_probabilities(state)
+            score = 0
+
+            for i in range(0, len(truth), NUM_BRIDGES):
+                truths = truth[i:i+NUM_BRIDGES]
+                preds = probs[i:i+NUM_BRIDGES]
+                if np.argmax(truths) == np.argmax(preds):
+                    score += 1
+
+            scores.append(score)
+
+            if next_move is not None:
+                zoombini = old_zoombini
+                action = next_move
+                old_zoombini = None
+                next_move = None
+            else:
+                together_count = top_count + bottom_count
+                zoombini = random.choice(list(zoombinis))
+                action = np.random.choice([0, 1], p=[top_count/together_count, bottom_count/together_count])
+                zoombinis.remove(zoombini)
+
+            result = game.send_zoombini(zoombini, action)
+
+            if result:
+                actual_score += 1
+                if action == 0:
+                    top_count += 1
+                else:
+                    bottom_count += 1
+            else:
+                old_zoombini = zoombini
+                next_move = (action + 1) % 2
+
+            running_scores.append(actual_score)
+        return game.has_won(), scores, actual_score, running_scores
+
+class WinningBridgePlayerNoHack():
+
+    def __init__(self):
+        self.brain = Brain(chkpt='models/brain')
+
+    def play(self, game):
+        zoombinis = set([i for i in range(NUM_ZOOMBINIS)])
+        moved_zoombinis = {}
+        next_move = None
+        scores = []
+        running_scores = []
+        moves = 0
+        actual_score = 0
+        truth = game.get_brain_truth()
+
+        old_zoombini = None
+        next_move = None
+        top_count = 1
+        bottom_count = 1
+
+        while game.can_move():
+            moves += 1
+
+            state = game.get_brain_state()
+            probs = self.brain.get_probabilities(state)
+            score = 0
+
+            for i in range(0, len(truth), NUM_BRIDGES):
+                truths = truth[i:i+NUM_BRIDGES]
+                preds = probs[i:i+NUM_BRIDGES]
+                if np.argmax(truths) == np.argmax(preds):
+                    score += 1
+
+            scores.append(score)
+
+            together_count = top_count + bottom_count
+            zoombini = random.choice(list(zoombinis))
+
+            if zoombini in moved_zoombinis:
+                action = moved_zoombinis[zoombini]
+            else:
+                action = np.random.choice([0, 1], p=[top_count/together_count, bottom_count/together_count])
+
+            result = game.send_zoombini(zoombini, action)
+
+            if result:
+                actual_score += 1
+                zoombinis.remove(zoombini)
+                if action == 0:
+                    top_count += 1
+                else:
+                    bottom_count += 1
+            else:
+                moved_zoombinis[zoombini] = (action + 1) % 2
+
+            running_scores.append(actual_score)
+        return game.has_won(), scores, actual_score, running_scores
+
+
 if __name__ == '__main__':
     import tqdm
-    player = EntropyPlayer()
+    player = WinningBridgePlayer()
 
     wins = 0
     scores = []
-    num_games = 1
+    num_games = 100
     for i in tqdm.tqdm(range(num_games)):
-        won, score = player.play(Game())
+        won, es, score, running_scores = player.play(Game())
         if won:
             wins += 1
         scores.append(score)
     print('win rate:', wins/num_games)
-    print(scores)
-    # print('avg score:', sum(scores)/len(scores))
+    # print(scores)
+    print('avg score:', sum(scores)/len(scores))
 
 
 
