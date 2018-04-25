@@ -1,18 +1,22 @@
 import random
 
-def play_game(env, actor):
+def play_game(env, actor, bnd):
   '''
   get a roll-out trace of an actor acting on an environment
   '''
-  trace = []
   s = env.reset()
+  trace = []
   done = False
+  i_iter = 0
 
   while not done:
     action = actor.act(s)
     ss, r, done = env.step(action)
     trace.append( (s, action, ss, r) )
     s = ss
+    # set a bound on the number of turns
+    i_iter += 1
+    if i_iter > bnd: done = True
 
   return trace
 
@@ -54,4 +58,13 @@ if __name__ == "__main__":
     buff.add(i)
 
   print (buff.sample())
+
+# ============= torch related utils =============
+
+import torch
+from torch.autograd import Variable
+def to_torch(x, req = False):
+  x = Variable(torch.from_numpy(x).type(torch.cuda.FloatTensor), requires_grad = req)
+  return x
+
 
