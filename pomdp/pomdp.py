@@ -39,12 +39,9 @@ class NetworkEnv(BaseEnv):
         return self.state == 6
 
     def reset(self):
-        # start in state 10 because randomly places in a different state
-        # and need to randomly start in 0-9 with a random obs
         self.state = 0
-        first_obs = 1
         self.actions = []
-        self.observations = [1]
+        self.observations = []
         return first_obs
 
 
@@ -58,10 +55,7 @@ class TigerEnv(BaseEnv):
         return 1 in self.actions or 2 in self.actions
 
     def reset(self):
-        # start in state 10 because randomly places in a different state
-        # and need to randomly start in 0-9 with a random obs
         self.state = 0
-        first_obs = 1
         self.actions = []
         self.observations = []
         return None
