@@ -15,7 +15,7 @@ class NetworkEnv(BaseEnv):
         super(NetworkEnv, self).__init__(os.path.join(os.path.dirname(__file__), 'specs/{}.pomdp'.format(filename)))
 
     def won(self):
-        return self.state == 'crash'
+        return self.state == 6
 
     def reset(self):
         # start in state 10 because randomly places in a different state
@@ -33,8 +33,8 @@ if __name__ == "__main__":
     buff = Buffer(10000)
 
     for i in range(1):
-        trace = play_game(env, r_actor, 10)
-        print(trace)
+        trace = play_game(env, r_actor, 1000)
+        print(len(trace))
         for tr in trace:
           buff.add(tr)
 
