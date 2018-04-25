@@ -51,6 +51,9 @@ class Buffer:
   def sample(self):
     return random.choice(self.buff)
 
+  def sample_k(self, k):
+    return random.choices(self.buff, k=k)
+
 
 if __name__ == "__main__":
   buff = Buffer(1000)

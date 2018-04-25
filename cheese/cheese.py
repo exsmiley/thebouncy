@@ -93,7 +93,7 @@ if __name__ == "__main__":
     buff = Buffer(10000)
 
     for i in range(1):
-        trace = play_game(env, r_actor)
+        trace = play_game(env, r_actor, 1000)
         print(trace)
         for tr in trace:
           buff.add(tr)
