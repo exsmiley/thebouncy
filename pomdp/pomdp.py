@@ -60,9 +60,24 @@ class TigerEnv(BaseEnv):
         self.observations = []
         return None
 
+class RingEnv(BaseEnv):
+    # based on http://cs.brown.edu/research/ai/pomdp/examples/tiger.aaai.POMDP
+
+    def __init__(self):
+        super(RingEnv, self).__init__('ring')
+
+    def done(self):
+        return self.state == 9
+
+    def reset(self):
+        self.state = 3
+        self.actions = []
+        self.observations = []
+        return None
+
 
 if __name__ == "__main__":
-    env = TigerEnv()
+    env = RingEnv()
     r_actor = RandomActor(env.possible_actions)
     buff = Buffer(10000)
 
