@@ -16,6 +16,9 @@ class BaseEnv(object):
         self.num_states = len(parsed.states)
         self.num_observations = len(parsed.observations)
 
+        self.actions = []
+        self.observations = []
+
     def _select_from_matrix(self, mat, state, action):
         probs = mat[(action, state)]
         keys = list(range(len(probs)))

@@ -69,7 +69,7 @@ class POMDPParser:
                 self.T2[(action, start)] = {ns: prob}
 
         for k, v in self.T2.items():
-            probs = [0 for i in range(len(v))]
+            probs = [0 for i in range(len(self.states))]
             for i, prob in v.items():
                 probs[i] = prob
             self.T2[k] = probs
@@ -84,7 +84,7 @@ class POMDPParser:
                 self.Z2[(action, start)] = {obs: prob}
 
         for k, v in self.Z2.items():
-            probs = [0 for i in range(len(v))]
+            probs = [0 for i in range(len(self.observations))]
             for i, prob in v.items():
                 probs[i] = prob
             self.Z2[k] = probs
@@ -150,11 +150,18 @@ class POMDPParser:
         elif len(pieces) == 3:
             # case 2: T: <action> : <start-state> : <next-state>
             # %f
-            start_state = self.states.index(pieces[1])
-            next_state = self.states.index(pieces[2])
-            next_line = self.contents[i+1]
-            prob = float(next_line)
-            self.T[(action, start_state, next_state)] = prob
+            if pieces[1] != '*':
+                start_state = self.states.index(pieces[1])
+                next_state = self.states.index(pieces[2])
+                next_line = self.contents[i+1]
+                prob = float(next_line)
+                self.T[(action, start_state, next_state)] = prob
+            else:
+                for start_state in range(len(self.states)):
+                    next_state = self.states.index(pieces[2])
+                    next_line = self.contents[i+1]
+                    prob = float(next_line)
+                    self.T[(action, start_state, next_state)] = prob
             return i + 2
         elif len(pieces) == 2:
             # case 3: T: <action> : <start-state>
@@ -205,8 +212,19 @@ class POMDPParser:
     def __get_observation(self, i):
         line = self.contents[i]
         pieces = [x for x in line.split() if (x.find(':') == -1)]
-        action = self.actions.index(pieces[0])
 
+        if pieces[0] != '*':
+            action = self.actions.index(pieces[0])
+            return self.__get_observation_helper(i, pieces, action)
+        else:
+            next_i = None
+            for action in range(len(self.actions)):
+                next_i = self.__get_observation_helper(i, pieces, action)
+            return next_i
+
+
+
+    def __get_observation_helper(self, i, pieces, action):
         if len(pieces) == 4:
             # case 1: O: <action> : <next-state> : <obs> %f
             next_state = self.states.index(pieces[1])
