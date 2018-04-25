@@ -29,8 +29,46 @@ class CheeseEnv(BaseEnv):
         return first_obs
 
 
+class NetworkEnv(BaseEnv):
+    # based on http://cs.brown.edu/research/ai/pomdp/examples/network.POMDP
+
+    def __init__(self):
+        super(NetworkEnv, self).__init__('network')
+
+    def done(self):
+        return self.state == 6
+
+    def reset(self):
+        # start in state 10 because randomly places in a different state
+        # and need to randomly start in 0-9 with a random obs
+        self.state = 0
+        first_obs = 1
+        self.actions = []
+        self.observations = [1]
+        return first_obs
+
+
+class TigerEnv(BaseEnv):
+    # based on http://cs.brown.edu/research/ai/pomdp/examples/tiger.aaai.POMDP
+
+    def __init__(self):
+        super(TigerEnv, self).__init__('tiger.aaai')
+
+    def done(self):
+        return 1 in self.actions or 2 in self.actions
+
+    def reset(self):
+        # start in state 10 because randomly places in a different state
+        # and need to randomly start in 0-9 with a random obs
+        self.state = 0
+        first_obs = 1
+        self.actions = []
+        self.observations = []
+        return None
+
+
 if __name__ == "__main__":
-    env = CheeseEnv()
+    env = TigerEnv()
     r_actor = RandomActor(env.possible_actions)
     buff = Buffer(10000)
 
@@ -41,7 +79,3 @@ if __name__ == "__main__":
           buff.add(tr)
 
     tr_sample = buff.sample_k(3)
-
-
-
-

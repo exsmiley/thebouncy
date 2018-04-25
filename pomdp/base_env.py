@@ -4,9 +4,10 @@ from parser import POMDPParser
 
 
 class BaseEnv(object):
-    # based on http://cs.brown.edu/research/ai/pomdp/examples/cheese.95.POMDP
+    # super class for all pomdp classes
 
     def __init__(self, filename):
+        print('Using {}...'.format(self.__class__.__name__))
         filename = os.path.join(os.path.dirname(__file__), 'specs/{}.pomdp'.format(filename))
         parsed = POMDPParser(filename)
         self.transitions = parsed.T
