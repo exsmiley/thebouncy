@@ -1,8 +1,9 @@
 import random
+from pomdp.base_env import BaseEnv
 from utils import *
 
 
-class CheeseEnv(object):
+class CheeseEnv(BaseEnv):
     # based on http://cs.brown.edu/research/ai/pomdp/examples/cheese.95.POMDP
 
     def __init__(self):
@@ -41,24 +42,10 @@ class CheeseEnv(object):
             11: {0: 7, 1: 7, 2: 7, 3: 7},
         }
 
-        self.reward = {
-            i: 0 for i in range(1, 11)
+        self.rewards = {
+            i: 0 for i in range(1, 12)
         }
-        self.reward[10] = 1
-
-    def _select_from_matrix(self, mat, action):
-        result = mat[self.state][action]
-
-        if type(result) != int:
-            keys = []
-            probs = []
-            for k, prob in result.items():
-                if prob > 0:
-                    keys.append(k)
-                    probs.append(prob)
-
-            result = random.choices(keys, weights=probs)[0]
-        return result
+        self.rewards[10] = 1
 
     def won(self):
         return self.state == 10
@@ -76,9 +63,9 @@ class CheeseEnv(object):
     def step(self, action):
         next_state = self._select_from_matrix(self.transitions, action)
         observation = self._select_from_matrix(self.observations_matrix, action)
+        reward = self._calc_reward()
 
         won = self.won()
-        reward = 1 if won else 0
         self.state = next_state
 
         self.actions.append(action)
