@@ -70,10 +70,10 @@ class RingEnv(BaseEnv):
         return self.state == 9
 
     def reset(self):
-        self.state = 3
+        self.state = random.randint(0,8)
         self.actions = []
         self.observations = []
-        return None
+        return self.state
 
 
 if __name__ == "__main__":
