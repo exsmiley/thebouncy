@@ -39,11 +39,10 @@ class BaseEnv(object):
         observation = self._get_obs(self.state, action)
         reward = self._calc_reward(self.state, action, next_state, observation)
 
-        won = self.won()
         self.state = next_state
-
         self.actions.append(action)
         self.observations.append(observation)
+        won = self.won()
 
         return observation, reward, won
 

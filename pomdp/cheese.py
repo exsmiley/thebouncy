@@ -11,11 +11,11 @@ class CheeseEnv(BaseEnv):
     # based on http://cs.brown.edu/research/ai/pomdp/examples/cheese.95.POMDP
 
     def __init__(self):
-        super(CheeseEnv, self).__init__('specs/cheese.pomdp')
+        super(CheeseEnv, self).__init__(os.path.join(os.path.dirname(__file__), 'specs/cheese.pomdp'))
         # actions: 0 = N, 1 = S, 2 = E, 3 = W
         
     def won(self):
-        return self.state == 9
+        return self.state == 10
 
     def reset(self):
         # start in state 10 because randomly places in a different state
@@ -41,7 +41,6 @@ if __name__ == "__main__":
           buff.add(tr)
 
     tr_sample = buff.sample_k(3)
-    print(tr_sample)
 
 
 
