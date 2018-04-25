@@ -1,4 +1,7 @@
 import random
+import numpy as np
+from collections import namedtuple
+Tr = namedtuple('Tr', 's a ss r, v')
 
 def play_game(env, actor, bnd):
   '''
@@ -12,13 +15,38 @@ def play_game(env, actor, bnd):
   while not done:
     action = actor.act(s)
     ss, r, done = env.step(action)
-    trace.append( (s, action, ss, r) )
+    trace.append( Tr(s, action, ss, r, None) )
     s = ss
     # set a bound on the number of turns
     i_iter += 1
     if i_iter > bnd: done = True
 
   return trace
+
+def get_discount_trace(trace, value_estimator):
+  '''
+  get the discounted future rewards
+  [0, 1, 0, 0, 1] => [0.99*(1 + 0.99^3), 1 + 0.99 ^3, 0.99^2, 0.99, 1]
+  '''
+  rewards = [tr.r for tr in trace]
+  discount_reward = [0.0]
+  for i in range(1, len(rewards)+1):
+    future_r = 0.99 * discount_reward[-i]
+    cur_r  = rewards[-i]
+    discount_reward.insert(0, cur_r + future_r)
+
+  # normalize data
+  discount_reward = discount_reward[:-1]
+  discount_reward = np.array(discount_reward)
+  discount_reward -= np.mean(discount_reward)
+  discount_reward /= np.std(discount_reward)
+
+  discount_trace = []
+  for i, tr in enumerate(trace):
+    discount_trace.append( Tr(tr.s, tr.a, tr.ss, discount_reward[i], value_estimator(tr.s)) )
+
+  return discount_trace
+
 
 class RandomActor:
   '''
@@ -63,8 +91,9 @@ if __name__ == "__main__":
 
 import torch
 from torch.autograd import Variable
-def to_torch(x, req = False):
-  x = Variable(torch.from_numpy(x).type(torch.cuda.FloatTensor), requires_grad = req)
+def to_torch(x, req = False, cuda=True):
+  dtype = torch.cuda.FloatTensor if cuda else torch.FloatTensor
+  x = Variable(torch.from_numpy(x).type(dtype), requires_grad = req)
   return x
 
 
