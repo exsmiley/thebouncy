@@ -1,5 +1,11 @@
 import numpy as np
+
+# make parent directory available
+import os,sys,inspect
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+
 from utils import *
+from ac_agent import *
 
 # length of board
 L = 10
@@ -20,13 +26,13 @@ def get_board():
       poses.append((crd[0],crd[1],d))
 
     joint_constr = or_constr(joint_cstr)
-    for i in range(L):
-      for j in range(L):
-        if joint_constr((i,j)):
-          occupied.append((i,j))
-          ret[i][j] = 1.0
+    for y in range(L):
+      for x in range(L):
+        if joint_constr((x,y)):
+          occupied.append((x,y))
+          ret[y][x] = 1
 
-    return ret, occupied, poses
+    return ret, set(occupied), poses
 
   ret, occupied, poses = _gen_boats()
   if len(occupied) == total_mass:
@@ -72,39 +78,61 @@ def mask_board(board, made_moves):
 class GameEnv(object):
 
   def __init__(self):
-    print ("okay init")
+    self.board, self.occupied, _ = get_board()
     self.possible_actions = list(range(L*L))
 
   def win(self):
-    for ocu in self.occupied:
-      if ocu not in self.made_moves:
-        return False
-    return True
+    return self.occupied.issubset(self.made_moves)
 
   def reset(self):
     # print('Start game')
-    self.board, self.occupied, _ = get_board()
     self.made_moves = set()
     return mask_board(self.board, self.made_moves)
 
   def step(self, action):
     x, y = action // L, action % L
+    reward = 1.0 if (self.board[y][x] == 1 and (x,y) not in self.made_moves) else 0.0
     self.made_moves.add((x,y))
-    reward = 1.0 if self.board[y][x] == 1 else 0.0
     done = self.win()
     state = mask_board(self.board, self.made_moves)
     return state, reward, done
 
+class StateXform:
+  def __init__(self):
+    self.length = L*L*3
+  def state_to_np(self, state):
+    ret = np.zeros(shape=(L*L, 3), dtype=np.float32)
+    ret_idx = np.resize(state, L*L)
+    for i in range(L*L):
+      ret[i, int(ret_idx[i])] = 1.0
+    ret = np.resize(ret, L*L*3)
+    return ret
+
+class ActionXform:
+  def __init__(self):
+    self.possible_actions = list(range(L*L))
+    self.length = L*L
+  def idx_to_action(self, idx):
+    return self.possible_actions[idx]
+
 if __name__ == "__main__":
-  env = GameEnv()
-  r_actor = RandomActor(env.possible_actions)
+  # r_actor = RandomActor(env.possible_actions)
+  state_xform, action_xform = StateXform(), ActionXform()
+  ac_actor = ACAgent(state_xform, action_xform).cuda()
+  ar_actor = RandomActor(action_xform.possible_actions)
   buff = Buffer(10000)
 
   for i in range(1000):
-    trace = play_game(env, r_actor)
+    env = GameEnv()
+    trace = play_game(env, ac_actor, 1000)
+
     for tr in trace:
+      # print (tr[0])
+      # print (tr[1])
+      print (tr[3])
       buff.add(tr)
 
+    assert 0, "game over man"
     tr_sample = buff.sample()
     print (tr_sample)
 
