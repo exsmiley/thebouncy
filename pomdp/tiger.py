@@ -7,30 +7,27 @@ from base_env import BaseEnv
 from utils import *
 
 
-class CheeseEnv(BaseEnv):
-    # based on http://cs.brown.edu/research/ai/pomdp/examples/cheese.95.POMDP
+class TigerEnv(BaseEnv):
+    # based on http://cs.brown.edu/research/ai/pomdp/examples/tiger.aaai.POMDP
 
     def __init__(self):
-        super(CheeseEnv, self).__init__('cheese')
-        # actions: 0 = N, 1 = S, 2 = E, 3 = W
-        
+        super(TigerEnv, self).__init__('tiger.aaai')
+
     def done(self):
-        return self.state == 10
+        return 1 in self.actions or 2 in self.actions
 
     def reset(self):
         # start in state 10 because randomly places in a different state
         # and need to randomly start in 0-9 with a random obs
-        pre_state = 10
-        self.observations = []
+        self.state = 0
+        first_obs = 1
         self.actions = []
-        self.state = self._get_next_state(pre_state, 0)
-        first_obs = self._get_obs(pre_state, 0)
-        self.observations.append(first_obs)
-        return first_obs
+        self.observations = []
+        return None
 
 
 if __name__ == "__main__":
-    env = CheeseEnv()
+    env = TigerEnv()
     r_actor = RandomActor(env.possible_actions)
     buff = Buffer(10000)
 
@@ -41,7 +38,3 @@ if __name__ == "__main__":
           buff.add(tr)
 
     tr_sample = buff.sample_k(3)
-
-
-
-

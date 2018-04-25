@@ -6,6 +6,8 @@ import xml.etree.ElementTree as ET
 import numpy as np
 
 class POMDPParser:
+    # NOTE: requires that file has a space after ':'
+
     def __init__(self, filename):
         """
         Parses .pomdp file and loads info into this object's fields.

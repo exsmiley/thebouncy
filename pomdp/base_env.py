@@ -1,4 +1,5 @@
 import random
+import os
 from parser import POMDPParser
 
 
@@ -6,8 +7,7 @@ class BaseEnv(object):
     # based on http://cs.brown.edu/research/ai/pomdp/examples/cheese.95.POMDP
 
     def __init__(self, filename):
-        # need custom matrices for children envs
-        #       transitions, observations, rewards
+        filename = os.path.join(os.path.dirname(__file__), 'specs/{}.pomdp'.format(filename))
         parsed = POMDPParser(filename)
         self.transitions = parsed.T
         self.observations_matrix = parsed.Z
@@ -45,12 +45,12 @@ class BaseEnv(object):
         self.state = next_state
         self.actions.append(action)
         self.observations.append(observation)
-        won = self.won()
+        done = self.done()
 
-        return observation, reward, won
+        return observation, reward, done
 
-    def won(self):
-        # need a won function
+    def done(self):
+        # need a done function
         pass
 
     def reset(self):

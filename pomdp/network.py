@@ -11,10 +11,9 @@ class NetworkEnv(BaseEnv):
     # based on http://cs.brown.edu/research/ai/pomdp/examples/network.POMDP
 
     def __init__(self):
-        filename = 'network'
-        super(NetworkEnv, self).__init__(os.path.join(os.path.dirname(__file__), 'specs/{}.pomdp'.format(filename)))
+        super(NetworkEnv, self).__init__('network')
 
-    def won(self):
+    def done(self):
         return self.state == 6
 
     def reset(self):
