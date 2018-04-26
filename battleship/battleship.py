@@ -8,8 +8,14 @@ from utils import *
 from ac_agent import *
 
 # length of board
-L = 10
-boat_shapes = [(2,4), (1,5), (1,3), (1,3), (1,3)]
+#L = 10
+#boat_shapes = [(2,4), (1,5), (1,3), (1,3), (1,3)]
+
+# L = 6
+# boat_shapes = [(2,4), (1,5), (1,3)]
+
+L = 2
+boat_shapes = [(2,2)]
 
 def get_board():
   total_mass = sum([x[0]*x[1] for x in boat_shapes])
@@ -86,27 +92,34 @@ class GameEnv(object):
 
   def reset(self):
     # print('Start game')
+    self.time = 0
     self.made_moves = set()
-    return mask_board(self.board, self.made_moves)
+    return self.time, mask_board(self.board, self.made_moves)
 
   def step(self, action):
+    self.time += 1
     x, y = action // L, action % L
-    reward = 1.0 if (self.board[y][x] == 1 and (x,y) not in self.made_moves) else 0.0
+    reward = 1.0 if (self.board[y][x] == 1 and (x,y) not in self.made_moves) else -0.01
     self.made_moves.add((x,y))
-    done = self.win()
+    done = self.win() or self.time == L*L
     state = mask_board(self.board, self.made_moves)
-    return state, reward, done
+    return (self.time, state), reward, done
 
 class StateXform:
   def __init__(self):
-    self.length = L*L*3
-  def state_to_np(self, state):
+    self.length = L*L*3 + L*L
+  def state_to_np(self, time_state):
+    time, state = time_state
     ret = np.zeros(shape=(L*L, 3), dtype=np.float32)
     ret_idx = np.resize(state, L*L)
     for i in range(L*L):
       ret[i, int(ret_idx[i])] = 1.0
     ret = np.resize(ret, L*L*3)
-    return ret
+
+    ret_time = np.zeros(shape=(L*L), dtype=np.float32)
+    ret_time[time] = 1.0
+
+    return np.concatenate([ret, ret_time], axis=0)
 
 class ActionXform:
   def __init__(self):
@@ -114,25 +127,27 @@ class ActionXform:
     self.length = L*L
   def idx_to_action(self, idx):
     return self.possible_actions[idx]
+  def action_to_idx(self, a):
+    return a
+  def action_to_1hot(self, a):
+    ret = np.zeros(L*L)
+    ret[a] = 1.0
+    return ret
 
 if __name__ == "__main__":
   # r_actor = RandomActor(env.possible_actions)
   state_xform, action_xform = StateXform(), ActionXform()
-  ac_actor = ACAgent(state_xform, action_xform).cuda()
-  ar_actor = RandomActor(action_xform.possible_actions)
+  ac_actor = PGAgent(state_xform, action_xform).cuda()
   buff = Buffer(10000)
+  game_bound = 10
 
-  for i in range(1000):
+  for i in range(1000000):
     env = GameEnv()
-    trace = play_game(env, ac_actor, 1000)
+    trace = play_game(env, ac_actor, game_bound)
+    print ([tr.a for tr in trace])
+    disc_trace = get_discount_trace(trace, ac_actor.value_estimator)
+    [buff.add(tr) for tr in disc_trace]
 
-    for tr in trace:
-      # print (tr[0])
-      # print (tr[1])
-      print (tr[3])
-      buff.add(tr)
-
-    assert 0, "game over man"
-    tr_sample = buff.sample()
-    print (tr_sample)
+    tr_sample = [buff.sample() for _ in range(20)]
+    ac_actor.learn(tr_sample)
 
