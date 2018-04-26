@@ -13,9 +13,10 @@ def play_game(env, actor, bnd):
   i_iter = 0
 
   while not done:
-    action = actor.act(s)
+    action, action_pr = actor.act(s)
+    action_pr = round(action_pr[action], 2)
     ss, r, done = env.step(action)
-    trace.append( Tr(s, action, ss, r, None) )
+    trace.append( Tr(s, action, ss, r, action_pr) )
     s = ss
     # set a bound on the number of turns
     i_iter += 1
@@ -39,7 +40,7 @@ def get_discount_trace(trace, value_estimator):
   discount_reward = discount_reward[:-1]
   discount_reward = np.array(discount_reward)
   discount_reward -= np.mean(discount_reward)
-  discount_reward /= np.std(discount_reward)
+  discount_reward /= (np.std(discount_reward) + 1e-3)
 
   discount_trace = []
   for i, tr in enumerate(trace):
@@ -99,4 +100,8 @@ def to_torch(x, req = False, cuda=True):
   x = Variable(torch.from_numpy(x).type(dtype), requires_grad = req)
   return x
 
+def to_torch_int(x, req = False, cuda=True):
+  dtype = torch.cuda.LongTensor if cuda else torch.LongTensor
+  x = Variable(torch.from_numpy(x).type(dtype), requires_grad = req)
+  return x
 
