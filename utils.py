@@ -2,6 +2,7 @@ import random
 import numpy as np
 from collections import namedtuple
 Tr = namedtuple('Tr', 's a ss r, v')
+Tr3 = namedtuple('Tr', 's a ss r v p')
 
 def play_game(env, actor, bnd):
   '''
@@ -13,13 +14,27 @@ def play_game(env, actor, bnd):
   i_iter = 0
 
   while not done:
-    action, action_pr = actor.act(s)
-    action_pr = round(action_pr[action], 2)
-    ss, r, done = env.step(action)
-    trace.append( Tr(s, action, ss, r, action_pr) )
-    s = ss
-    # set a bound on the number of turns
-    i_iter += 1
+    try:
+      stuff = actor.act(s, disallowed=env.not_allowed())
+    except:
+      stuff = actor.act(s)
+    if len(stuff) == 3:
+      action, action_pr, sv = stuff
+      action_pr = round(action_pr[action], 2)
+      ss, r, done = env.step(action)
+
+      trace.append( Tr3(s, action, ss, r, sv, action_pr) )
+      s = ss
+      # set a bound on the number of turns
+      i_iter += 1
+    else:
+      action, action_pr = stuff
+      action_pr = round(action_pr[action], 2)
+      ss, r, done = env.step(action)
+      trace.append( Tr(s, action, ss, r, action_pr) )
+      s = ss
+      # set a bound on the number of turns
+      i_iter += 1
     if i_iter > bnd: done = True
 
   return trace
@@ -44,7 +59,10 @@ def get_discount_trace(trace, value_estimator):
 
   discount_trace = []
   for i, tr in enumerate(trace):
-    discount_trace.append( Tr(tr.s, tr.a, tr.ss, discount_reward[i], value_estimator(tr.s)) )
+    if type(tr) == Tr:
+      discount_trace.append( Tr(tr.s, tr.a, tr.ss, discount_reward[i], value_estimator(tr.s)) )
+    else:
+      discount_trace.append( Tr3(tr.s, tr.a, tr.ss, discount_reward[i], tr.v, tr.p) )
 
   return discount_trace
 
