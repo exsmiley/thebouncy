@@ -131,6 +131,7 @@ class MastermindEnv(object):
         self.guess_feedbacks = []
         self.won = False
         self.game = Mastermind()
+        return 0, []
 
     def win(self):
         return self.won
@@ -143,7 +144,7 @@ class MastermindEnv(object):
         self.won = self.game.is_winning_feedback(feedback)
         reward = 1 if self.won else 0
         self.guess_feedbacks.append((action, feedback))
-        return (len(self.guess_feedbacks), self.guess_feedbacks), reward, self.can_move()
+        return (len(self.guess_feedbacks), self.guess_feedbacks), reward, not self.can_move()
 
 
 
@@ -160,12 +161,16 @@ class StateXform:
 
 class ActionXform:
   def __init__(self):
-    self.possible_actions = list(range(L*L))
-    self.length = L*L
+    self.possible_actions = list(range(NUM_ALL_GUESSES))
+    self.length = NUM_ALL_GUESSES
   def idx_to_action(self, idx):
-    return self.possible_actions[idx]
+    return get_guess(idx)
   def action_to_idx(self, a):
-    return a
+    # TODO optimize
+    for i, g in enumerate(ALL_GUESSES):
+        if g == a:
+            return i
+    return -1
   def action_to_1hot(self, a):
     ret = np.zeros(L*L)
     ret[a] = 1.0
@@ -176,7 +181,7 @@ if __name__ == '__main__':
     # game = Mastermind([4, 2, 3, 4])
     # print game.guess([4, 5, 6, 7]), (1, 1)
     # print game.guess([4, 3, 3, 1]), (2, 2)
-
+    print([(x, i) for (x, i) in enumerate(ALL_GUESSES)])
     target = [2, 4, 2, 5]
     game = Mastermind(target)
     print(game.get_brain_truth())
