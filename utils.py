@@ -3,7 +3,7 @@ import numpy as np
 from collections import namedtuple
 Tr = namedtuple('Tr', 's a ss r, v')
 
-def play_game(env, actor, bnd):
+def play_game(env, actor, bnd, det=False):
   '''
   get a roll-out trace of an actor acting on an environment
   '''
@@ -13,14 +13,21 @@ def play_game(env, actor, bnd):
   i_iter = 0
 
   while not done:
-    action, action_pr = actor.act(s)
-    action_pr = round(action_pr[action], 2)
+    forbid = getattr(env, "forbid", None)
+    forbid = forbid() if forbid is not None else set([])
+
+    action, action_pr = actor.act(s, forbid, det)
+    action_pr = [round(x,2) for x in action_pr]
+    # action_pr = action_pr[action]
     ss, r, done = env.step(action)
-    trace.append( Tr(s, action, ss, r, action_pr) )
-    s = ss
     # set a bound on the number of turns
     i_iter += 1
-    if i_iter > bnd: done = True
+    if i_iter > bnd: 
+      done = True
+      # r = env.get_final_reward()
+
+    trace.append( Tr(s, action, ss, r, action_pr) )
+    s = ss
 
   return trace
 
@@ -32,7 +39,7 @@ def get_discount_trace(trace, value_estimator):
   rewards = [tr.r for tr in trace]
   discount_reward = [0.0]
   for i in range(1, len(rewards)+1):
-    future_r = 0.99 * discount_reward[-i]
+    future_r = 0.9 * discount_reward[-i]
     cur_r  = rewards[-i]
     discount_reward.insert(0, cur_r + future_r)
 
