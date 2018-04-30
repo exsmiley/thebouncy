@@ -9,6 +9,9 @@ ENCODER_VECTOR_LENGTH = NUM_PEGS*NUM_OPTIONS + NUM_PEGS + NUM_PEGS*(NUM_PEGS+1)+
 EMBEDDED_LENGTH = ENCODER_VECTOR_LENGTH  #50
 
 
+BRAIN_INPUT_LENGTH = 10*ENCODER_VECTOR_LENGTH
+OUTPUT_LENGTH = NUM_PEGS*NUM_OPTIONS
+
 def generate_all_targets(num_pegs, num_options):
     '''returns iterator over all targets'''
     return itertools.product(range(num_options), repeat=num_pegs)
@@ -16,6 +19,7 @@ def generate_all_targets(num_pegs, num_options):
 
 # TODO maybe figure out how to generate this in the function and cache it
 ALL_GUESSES = list(generate_all_targets(NUM_PEGS, NUM_OPTIONS))
+NUM_ALL_GUESSES = len(ALL_GUESSES)
 def get_guess(i):
     '''gets the guess at index i'''
     return ALL_GUESSES[i]
@@ -25,7 +29,7 @@ def random_guess():
 
 
 def guess_to_vector(guess):
-    vec = [0 for i in xrange(NUM_OPTIONS+1)]*NUM_PEGS
+    vec = [0 for i in range(NUM_OPTIONS+1)]*NUM_PEGS
 
     for i, option in enumerate(guess):
         index = i*(NUM_OPTIONS+1) + option + 1
@@ -34,10 +38,20 @@ def guess_to_vector(guess):
     return vec
 
 
+def truth_to_vector(truth):
+    vec = [0 for i in range(OUTPUT_LENGTH)]
+
+    for i, option in enumerate(truth):
+        index = i*(NUM_OPTIONS) + option
+        vec[index] = 1
+
+    return vec
+
+
 def feedback_to_vector(feedback):
     num_exist, num_match = feedback
 
-    vec = [0 for i in xrange(NUM_PEGS*(NUM_PEGS+1)+2)]
+    vec = [0 for i in range(NUM_PEGS*(NUM_PEGS+1)+2)]
     # print feedback, num_exist+4*num_match+1, len(vec)
     vec[num_exist+4*num_match+1] = 1
 
@@ -54,11 +68,11 @@ def unencoded_vector(guess, feedback):
 
 def random_numbers():
     options = range(NUM_OPTIONS)
-    return [random.choice(options) for i in xrange(NUM_PEGS)]
+    return [random.choice(options) for i in range(NUM_PEGS)]
 
 def get_counts(arr):
     '''get counts for each of the numbers'''
-    counts = {i: 0 for i in xrange(NUM_OPTIONS)}
+    counts = {i: 0 for i in range(NUM_OPTIONS)}
 
     for num in arr:
         counts[num] += 1
@@ -80,7 +94,7 @@ def validate_attempt(target, attempt):
             num_exist += 1
 
     # compare arrays to get num_match
-    for i in xrange(len(attempt)):
+    for i in range(len(attempt)):
         if attempt[i] == target[i]:
             num_match += 1
 
@@ -104,6 +118,59 @@ class Mastermind(object):
     def is_winning_feedback(self, feedback):
         return feedback[1] == NUM_PEGS
 
+    def get_brain_truth(self):
+        return truth_to_vector(self.target)
+
+
+class MastermindEnv(object):
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.guess_feedbacks = []
+        self.won = False
+        self.game = Mastermind()
+
+    def win(self):
+        return self.won
+
+    def can_move(self):
+        return self.won or len(self.guess_feedbacks) < 10
+
+    def step(self, action):
+        feedback = self.game.guess(action)
+        self.won = self.game.is_winning_feedback(feedback)
+        reward = 1 if self.won else 0
+        self.guess_feedbacks.append((action, feedback))
+        return (len(self.guess_feedbacks), self.guess_feedbacks), reward, self.can_move()
+
+
+
+class StateXform:
+  def __init__(self):
+    self.length = BRAIN_INPUT_LENGTH
+  def state_to_np(self, time_state):
+    _, action_feedback = time_state
+    action_feedback = action_feedback[:10]
+    state = np.zeros(shape=(1, self.length))
+    for i, (action, feedback) in enumerate(action_feedback):
+        state[:,(i)*EMBEDDED_LENGTH:(i+1)*EMBEDDED_LENGTH] = np.array(unencoded_vector(action, feedback)).reshape(-1, ENCODER_VECTOR_LENGTH)
+    return state
+
+class ActionXform:
+  def __init__(self):
+    self.possible_actions = list(range(L*L))
+    self.length = L*L
+  def idx_to_action(self, idx):
+    return self.possible_actions[idx]
+  def action_to_idx(self, a):
+    return a
+  def action_to_1hot(self, a):
+    ret = np.zeros(L*L)
+    ret[a] = 1.0
+    return ret
+
 
 if __name__ == '__main__':
     # game = Mastermind([4, 2, 3, 4])
@@ -111,15 +178,9 @@ if __name__ == '__main__':
     # print game.guess([4, 3, 3, 1]), (2, 2)
 
     target = [2, 4, 2, 5]
-    # game = Mastermind(target)
+    game = Mastermind(target)
+    print(game.get_brain_truth())
     # print game.guess(target)
 
     guess = [3, 4, 1, 2]
-    print validate_attempt(target, guess) == validate_attempt(guess, target)
-    import time
-    start = time.time()
-    for i in xrange(1296):
-        validate_attempt(target, guess)
-    t = time.time()-start
-    print t
-    print t*1296
+    print(validate_attempt(target, guess) == validate_attempt(guess, target))
