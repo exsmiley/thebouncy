@@ -50,13 +50,18 @@ class ACAgent(nn.Module):
     return action_pr, state_value
 
   # generate an action from a game state x
-  def act(self, x):
+  def act(self, x, forbid=set([])):
     x = self.state_xform.state_to_np(x)
     # wrap an additional dimension around it so it has a "batch" dimension
     x = to_torch(np.expand_dims(x,0))
     action_pr, _ = self.predict(x)
     # print ("action prob ", action_pr)
     action_pr = action_pr.data.cpu().numpy()[0]
+
+    for idx in forbid:
+      action_pr[idx] = 0.0
+    action_pr /= np.sum(action_pr)
+    
     action_id = np.random.choice(range(len(action_pr)), p=action_pr)
     return self.action_xform.idx_to_action(action_id), action_pr
 
@@ -109,7 +114,7 @@ class ACAgent(nn.Module):
     # print ("value loss")
     # print (value_loss)
 
-    loss = value_loss - action_gain# - 0.0001*entropy
+    loss = value_loss - action_gain - entropy
 
     self.actor_opt.zero_grad()
     self.critic_opt.zero_grad()
@@ -138,18 +143,22 @@ class PGAgent(nn.Module):
     the state and action between the game representation and 1d array representation
     '''
     super(PGAgent, self).__init__()
+    self.explore = 1.0
+
     state_length, action_length = state_xform.length, action_xform.length
     self.state_xform, self.action_xform = state_xform, action_xform
     # 1 hidden layer, then predict the action and the value of state
-    self.action_pred = nn.Linear(state_length, action_length)
-    self.all_opt = torch.optim.Adam(self.parameters(), lr=0.01)
+    self.enc = nn.Linear(state_length, state_length * 10)
+    self.action_pred = nn.Linear(state_length * 10, action_length)
+    self.all_opt = torch.optim.Adam(self.parameters(), lr=1e-3)
 
   # predict the probablity and the value on input state x
   # work over batched dimensions [batch x ...]
   def predict(self, x):
+    x = F.relu(self.enc(x)) 
     action_scores = self.action_pred(x)
     # action_pr = F.softmax(action_scores, dim=-1) + 1e-8
-    action_pr = F.softmax(action_scores, dim=-1) + (0.1 / self.action_xform.length)
+    action_pr = F.softmax(action_scores, dim=-1) + (self.explore / self.action_xform.length)
     #sumsum = torch.sum(action_pr, dim=1).expand_as(action_pr)
     sumsum = torch.sum(action_pr, dim=1, keepdim=True)
     action_pr = action_pr.div(sumsum)
@@ -157,14 +166,21 @@ class PGAgent(nn.Module):
     return action_pr, state_value
 
   # generate an action from a game state x
-  def act(self, x):
+  def act(self, x, forbid=set([]), det=False):
     x = self.state_xform.state_to_np(x)
     # wrap an additional dimension around it so it has a "batch" dimension
     x = to_torch(np.expand_dims(x,0))
     action_pr, _ = self.predict(x)
     # print ("action prob ", action_pr)
     action_pr = action_pr.data.cpu().numpy()[0]
-    action_id = np.random.choice(range(len(action_pr)), p=action_pr)
+
+    for idx in forbid:
+      action_pr[idx] = 0.0
+    action_pr /= np.sum(action_pr)
+
+    action_id = np.random.choice(range(len(action_pr)), p=action_pr) \
+                if not det \
+                else np.argmax(action_pr)
     return self.action_xform.idx_to_action(action_id), action_pr
 
   # predict the value of a game state x
@@ -203,6 +219,7 @@ class PGAgent(nn.Module):
     cost = - overall_fitness
     self.all_opt.zero_grad()
     cost.backward()
+    nn.utils.clip_grad_norm(self.parameters(), 0.5)
     self.all_opt.step()
 
   def load(self, loc):
