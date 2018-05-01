@@ -9,6 +9,12 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 
+# make parent directory available
+import os,sys,inspect
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+
+from utils import *
+
 
 # tunable hyperparameters
 NUM_RUNS = 100000
@@ -16,7 +22,8 @@ SAMPLE_SIZE = 100
 LEARNING_RATE = 1e-3
 MOMENTUM = 0.9
 TO_TRAIN = True
-USE_OLD = True
+USE_OLD = False
+PLAY = True
 REWARD_SCALE_FACTOR = 100 # amount to divide entropy by
 
 OLD_CHKPT = None
@@ -29,8 +36,8 @@ class Brain(nn.Module):
     def __init__(self, chkpt=None):
         super(Brain, self).__init__()
 
-        self.fc1 = nn.Linear(BRAIN_INPUT_LENGTH, 1000)
-        self.fc2 = nn.Linear(1000, OUTPUT_LENGTH)
+        self.fc1 = nn.Linear(BRAIN_INPUT_LENGTH, 3000)
+        self.fc2 = nn.Linear(3000, OUTPUT_LENGTH)
 
         if chkpt is not None:
             self.load(chkpt)
@@ -63,6 +70,21 @@ class Brain(nn.Module):
                 vecs[j] /= total
 
         return list(vecs)
+
+    def get_action_probabilities(self, state):
+        pred = self.get_probabilities(state)
+        split_pred = list(map(list, np.split(np.array(pred), 4)))
+
+        all_preds = []
+
+        for guess in ALL_GUESSES:
+            prob = 1
+            for i, peg in enumerate(guess):
+                prob *= split_pred[i][peg]
+            all_preds.append(prob)
+
+        return all_preds
+
 
     def load(self, name='models/brain'):
         self.load_state_dict(torch.load(name))
@@ -119,8 +141,7 @@ class BrainTrainer(object):
         loss = self.criterion(output, feedbacks)
         loss.backward()
         self.optimizer.step()
-
-        print('Loss:', sum(loss.data.numpy()))
+        print('Loss:', loss.data.numpy())
 
         # reset buffers
         self.state_buffer = []
@@ -132,8 +153,9 @@ class BrainTrainer(object):
         sent_indices = set()
         states = []
         feedbacks = []
+        count = 0
 
-        while env.can_move():
+        while env.can_move() or len(states) < 5:
             index = random.randint(0, NUM_ALL_GUESSES-1)
 
             while index in sent_indices:
@@ -176,17 +198,75 @@ class BrainTrainer(object):
 
 
 
-class EntropyRewardOracle(object):
+class BrainAgent(object):
 
-    def __init__(self):
+    def __init__(self, state_xform, action_xfrom, num_random=0):
         self.brain = Brain(chkpt='models/brain')
+        self.state_xform = state_xform
+        self.action_xfrom = action_xfrom
+        self.num_random = num_random
+        self.made_moves = []
 
-    def get_reward(self, state, action):
-        entropies = self.brain.get_entropies(state)
-        return entropies[action]/REWARD_SCALE_FACTOR
+    def reset(self):
+        self.made_moves = []
+
+    def act(self, x):
+        if len(x) < self.num_random:
+            move = random_guess()
+            return tuple(move), {tuple(move): 1.0}
+        state = self.state_xform.state_to_np(x)
+
+
+        pred = self.brain.get_probabilities(state)
+        split_pred = list(map(list, np.split(np.array(pred), 4)))
+
+        guess = []
+        prob = 1
+
+        for p in split_pred:
+            val = np.argmax(p)
+            prob *= p[val]
+            guess.append(val)
+
+        action = tuple(guess)
+
+        # pred = self.brain.get_action_probabilities(state)
+
+        # for move in self.made_moves:
+        #     pred[move] = 0
+
+        # pred = np.array(pred)
+
+        # pred = pred / sum(pred)
+
+        # action = np.random.choice(range(NUM_ALL_GUESSES), p=pred)
+        # self.made_moves.append(action)
+
+        # pred = {i: p for i, p in enumerate(pred)}
+        # pred[tuple(self.action_xfrom.idx_to_action(action))] = pred[action]
+
+        return action, {action: prob}
+
 
 
 if __name__ == '__main__':
+    if PLAY:
+        state_xform, action_xform = StateXform(), ActionXform()
+        ac_actor = BrainAgent(state_xform, action_xform)
+        game_bound = 11
+        score = 0
+        num_games = 100
+
+        for i in tqdm.tqdm(range(num_games)):
+            env = MastermindEnv()
+            ac_actor.reset()
+            trace = play_game(env, ac_actor, game_bound)
+            print(trace)
+            score += sum([tr.r for tr in trace])
+
+        print('avg score:', score/num_games)
+
+        quit()
     if TO_TRAIN:
         trainer = BrainTrainer(chkpt=OLD_CHKPT)
         trainer.run()
@@ -194,3 +274,4 @@ if __name__ == '__main__':
     else:
         trainer = BrainTrainer(chkpt='models/brain')
         trainer.test()
+
