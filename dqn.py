@@ -11,9 +11,9 @@ import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as T
 
-Tr = namedtuple('Tr', ('state', 'action', 'next_state', 'reward', 'last'))
+Tr = namedtuple('Tr', ('s', 'a', 'ss', 'r', 'last'))
 
-from utils import to_torch
+from utils import to_torch, to_torch_int, to_torch_byte
 
 def dqn_play_game(env, actor, bnd, epi):
     '''
@@ -49,11 +49,11 @@ class ReplayMemory(object):
         self.memory = []
         self.position = 0
 
-    def push(self, *args):
+    def push(self, tr):
         """Saves a transition."""
         if len(self.memory) < self.capacity:
             self.memory.append(None)
-        self.memory[self.position] = Transition(*args)
+        self.memory[self.position] = tr
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
@@ -94,11 +94,13 @@ class Trainer:
     def __init__(self, game_bound):
         self.BATCH_SIZE = 128
         self.GAMMA = 0.999
-        self.EPS_START = 0.9
+        self.EPS_START = 0.99
         self.EPS_END = 0.05
-        self.EPS_DECAY = 200
-        self.TARGET_UPDATE = 10
-        self.num_episodes = 1000
+        self.EPS_DECAY = 10000
+        self.TARGET_UPDATE = 100
+        self.UPDATE_PER_ROLLOUT = 20
+
+        self.num_episodes = 10000
 
         self.game_bound = game_bound
 
@@ -109,31 +111,31 @@ class Trainer:
         epi = e_t + (e_s - e_t) * math.exp(-1. * steps_done / e_decay)
         return epi
 
-    def optimize_model(self, memory):
-        # if we don't even have enough stuff just don't learn
-        if len(memory) < self.BATCH_SIZE:
-            return
-        transitions = memory.sample(BATCH_SIZE)
-        # Transpose the batch (see http://stackoverflow.com/a/19343/3343043 for
-        # detailed explanation).
-        batch = Transition(*zip(*transitions))
+    def optimize_model(self, policy_net, target_net, transitions, optimizer):
 
-        state_batch = torch.cat(batch.state)
-        action_batch = torch.cat(batch.action)
-        reward_batch = torch.cat(batch.reward)
+        s_batch = to_torch(np.array([policy_net.state_xform.state_to_np(tr.s)\
+                for tr in transitions]))
+        a_batch = to_torch_int(np.array([[policy_net.action_xform.action_to_idx(tr.a)]\
+                for tr in transitions]))
+        r_batch = to_torch(np.array([(tr.r)\
+                for tr in transitions]))
+        ss_batch = to_torch(np.array([policy_net.state_xform.state_to_np(tr.ss)\
+                for tr in transitions]))
+        fin_batch = torch.Tensor([tr.last for tr in transitions]).byte().cuda()
 
-        # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
-        # columns of actions taken
-        state_action_values = policy_net(state_batch).gather(1, action_batch)
+        # Q[s,a]
+        all_sa_values = policy_net(s_batch)
+        sa_values = all_sa_values.gather(1, a_batch)
 
-        # Compute V(s_{t+1}) for all next states.
-        next_state_values = torch.zeros(BATCH_SIZE, device=device)
-        next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0].detach()
-        # Compute the expected Q values
-        expected_state_action_values = (next_state_values * GAMMA) + reward_batch
-
-        # Compute Huber loss
-        loss = F.smooth_l1_loss(state_action_values, expected_state_action_values.unsqueeze(1))
+        # V[ss] = max_a(Q[ss,a]) if ss not last_state else 0.0
+        all_ssa_values = target_net(ss_batch)
+        best_ssa_values = all_ssa_values.max(1)[0].detach()
+        ss_values = best_ssa_values.masked_fill_(fin_batch, 0.0)
+        
+        # Q-target[s,a] = reward[s,a] + discount * V[ss]
+        target_sa_values = r_batch + (ss_values * self.GAMMA)
+        # Compute Huber loss |Q[s,a] - Q-target[s,a]|
+        loss = F.smooth_l1_loss(sa_values, target_sa_values.unsqueeze(1))
 
         # Optimize the model
         optimizer.zero_grad()
@@ -143,7 +145,7 @@ class Trainer:
         optimizer.step()
 
 
-    def train(self, policy_net, target_net, env_maker):
+    def train(self, policy_net, target_net, env_maker, game_bnd, measure):
         # policy_net = DQN().to(device)
         # target_net = DQN().to(device)
         target_net.load_state_dict(policy_net.state_dict())
@@ -153,22 +155,26 @@ class Trainer:
 
         for i_episode in range(self.num_episodes):
             epi = self.compute_epi(i_episode) 
-            print (" = = = = = = ", i_episode, " ", epi)
-            trace = dqn_play_game(env_maker(), policy_net, self.game_bound, epi) 
-            print (trace)
-#                 # Move to the next state
-#                 state = next_state
-# 
-#                 # Perform one step of the optimization (on the target network)
-#                 optimize_model()
-#                 if done:
-#                     episode_durations.append(t + 1)
-#                     plot_durations()
-#                     break
-#             # Update the target network
-#             if i_episode % TARGET_UPDATE == 0:
-#                 target_net.load_state_dict(policy_net.state_dict())
-# 
 
+            # collect trace
+            trace = dqn_play_game(env_maker(), policy_net, game_bnd, epi) 
+            for tr in trace:
+                memory.push(tr)
+
+            # perform 
+            if len(memory) > self.BATCH_SIZE:
+                for j_train in range(self.UPDATE_PER_ROLLOUT):
+                    transitions = memory.sample(self.BATCH_SIZE)
+                    self.optimize_model(policy_net, target_net, transitions, optimizer)
+ 
+            # periodically bring target network up to date
+            if i_episode % self.TARGET_UPDATE == 0:
+                target_net.load_state_dict(policy_net.state_dict())
+
+            # periodically print out some diagnostics
+            if i_episode % 100 == 0:
+                print (" ============== i t e r a t i o n ============= ", i_episode)
+                print (" episilon ", epi)
+                print (" measure ", measure(policy_net, game_bnd))
 
 

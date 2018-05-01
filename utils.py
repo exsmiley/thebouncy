@@ -112,3 +112,8 @@ def to_torch_int(x, req = False, cuda=True):
   x = Variable(torch.from_numpy(x).type(dtype), requires_grad = req)
   return x
 
+def to_torch_byte(x, req = False, cuda=True):
+  dtype = torch.cuda.ByteTensor if cuda else torch.ByteTensor
+  x = Variable(torch.from_numpy(x).type(dtype), requires_grad = req)
+  return x
+
