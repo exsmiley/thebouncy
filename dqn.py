@@ -78,13 +78,18 @@ class DQN(nn.Module):
         state_length, action_length = state_xform.length, action_xform.length
         self.state_xform, self.action_xform = state_xform, action_xform
 
-        self.enc  = nn.Linear(state_length, state_length * 10)
-        self.bn = nn.BatchNorm1d(state_length * 10)
+        self.enc1  = nn.Linear(state_length, state_length * 10)
+        self.bn1 = nn.BatchNorm1d(state_length * 10)
+        self.enc2  = nn.Linear(state_length * 10, state_length * 10)
+        self.bn2 = nn.BatchNorm1d(state_length * 10)
         self.head = nn.Linear(state_length * 10, action_length)
 
     def forward(self, x):
         batch_size = x.size()[0]
-        x = F.relu(self.enc(x)) if batch_size == 1 else F.relu(self.bn(self.enc(x)))
+        def optional_bn(x, bn, size):
+            return x if size == 1 else bn(x)
+        x = optional_bn(self.enc1(x), self.bn1, batch_size)
+        x = optional_bn(self.enc2(x), self.bn2, batch_size)
         return self.head(x)
 
     def act(self, x, epi):
@@ -176,6 +181,9 @@ class Trainer:
             trace = dqn_play_game(env_maker(), policy_net, self.game_bound, epi) 
             for tr in trace:
                 memory.push(tr)
+                if len(memory) == memory.capacity:
+                    print ("buffer is full")
+                    return
 
             # perform 
             if len(memory) > self.BATCH_SIZE:
