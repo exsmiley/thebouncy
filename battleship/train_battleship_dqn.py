@@ -39,4 +39,4 @@ if __name__ == "__main__":
             }
 
     trainer = Trainer(params)
-    trainer.train(dqn_policy, dqn_target, GameEnv, measure_dqn)
+    trainer.train(dqn_policy, dqn_target, GameEnv)

@@ -6,6 +6,7 @@ from itertools import count
 
 import cv2
 import torch
+import tqdm
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
@@ -41,6 +42,14 @@ def dqn_play_game(env, actor, bnd, epi):
         s = ss
 
     return trace
+
+def measure_dqn(env_class, agent, bnd):
+    score = 0.0
+    for i in range(100):
+        env = env_class()
+        trace = dqn_play_game(env, agent, bnd, 0.0)
+        score += sum([tr.r for tr in trace])
+    return score / 100
 
 class ReplayMemory(object):
 
@@ -146,7 +155,7 @@ class Trainer:
         optimizer.step()
 
 
-    def train(self, policy_net, target_net, env_maker, measure):
+    def train(self, policy_net, target_net, env_maker):
         # policy_net = DQN().to(device)
         # target_net = DQN().to(device)
         target_net.load_state_dict(policy_net.state_dict())
@@ -160,7 +169,7 @@ class Trainer:
             for tr in trace:
                 memory.push(tr)
 
-        for i_episode in range(self.num_episodes):
+        for i_episode in tqdm.tqdm(range(self.num_episodes)):
             epi = self.compute_epi(i_episode) 
 
             # collect trace
@@ -183,7 +192,7 @@ class Trainer:
             if i_episode % 100 == 0:
                 print (" ============== i t e r a t i o n ============= ", i_episode)
                 print (" episilon ", epi)
-                print (" measure ", measure(policy_net, self.game_bound))
+                print (" measure ", measure_dqn(env_maker, policy_net, self.game_bound))
                 print (" replay size ", len(memory))
 
 

@@ -305,9 +305,13 @@ class GameEnv(object):
         # print('Start game')
         self.game = game if game else Game()
         self.actions = set()
-        return np.array(self.game.get_agent_state())#.reshape(1, -1)
+        self.truth = self.game.get_brain_truth()
+        return np.array(self.game.get_agent_state()), self.truth
 
-    def step(self, action, verbose=False, reward_shaper=None):
+    def win(self):
+        return self.game.has_won()
+
+    def step(self, action):#, verbose=False, reward_shaper=None):
         # action is an int
         # action/num_bridges is the zoombini, action % num_bridges is the bridge
         self.actions.add(action)
@@ -322,24 +326,61 @@ class GameEnv(object):
         reward = 1 if passed else 0
         done = not self.game.can_move()
 
-        if verbose:
-            passed_str = 'PASSED' if passed else 'failed'
-            print('Sending Zoombini {} to {} and it {}'.format(zoombini, bridge, passed_str))
-        if reward_shaper:
-            if already_passed:
-                reward2 = 0
-            else:
-                reward2 = reward_shaper.get_reward(self.game.get_brain_state(), action)
-            return state, reward, done, reward2
-        else:
-            return state, reward, done
+        state = state, self.truth
 
-    def check_valid_move(self, action):
-        zoombini = action//NUM_BRIDGES
-        return not self.game.zoombinis[zoombini].has_passed
+        # if verbose:
+        #     passed_str = 'PASSED' if passed else 'failed'
+        #     print('Sending Zoombini {} to {} and it {}'.format(zoombini, bridge, passed_str))
+        # if reward_shaper:
+        #     if already_passed:
+        #         reward2 = 0
+        #     else:
+        #         reward2 = reward_shaper.get_reward(self.game.get_brain_state(), action)
+        #     return state, reward, done, reward2
+        # else:
+        return state, reward, done
 
-    def get_invalid_moves(self):
+    # def check_valid_move(self, action):
+    #     zoombini = action//NUM_BRIDGES
+    #     return not self.game.zoombinis[zoombini].has_passed
+
+    def forbid(self):
         return self.game.get_invalid_moves()
+
+class StateXform:
+  def __init__(self):
+    # self.length = L*L*2 * 2
+    self.length = AGENT_INPUT_LENGTH + OUTPUT_LENGTH
+  def board_to_np(self, state):
+    return state
+    # ret = np.zeros(shape=(L*L,2), dtype=np.float32)
+    # ret_idx = np.resize(state, L*L)
+    # for i in range(L*L):
+    #   if int(ret_idx[i]) != 2:
+    #     ret[i, int(ret_idx[i])] = 1.0
+    # ret = np.resize(ret, L*L*2)
+    # return ret
+  def state_to_np(self, state):
+    board_mask, board_truth = state
+    ret =  np.concatenate((self.board_to_np(board_mask),\
+                           self.board_to_np(board_truth)))
+    # ret =  self.board_to_np(board_mask)
+    # ret =  self.board_to_np(board_mask)
+    # ret =  self.board_to_np(board_truth)
+    return ret
+
+class ActionXform:
+  def __init__(self):
+    self.possible_actions = list(range(OUTPUT_LENGTH))
+    self.length = OUTPUT_LENGTH
+  def idx_to_action(self, idx):
+    return self.possible_actions[idx]
+  def action_to_idx(self, a):
+    return a
+  def action_to_1hot(self, a):
+    ret = np.zeros(self.length)
+    ret[a] = 1.0
+    return ret
 
 if __name__ == '__main__':
     g = Game()
