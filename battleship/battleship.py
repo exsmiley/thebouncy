@@ -11,14 +11,17 @@ from ac_agent import *
 from not_dqn import *
 
 # length of board
-#L = 10
-#boat_shapes = [(2,4), (1,5), (1,3), (1,3), (1,3)]
+# L = 10
+# boat_shapes = [(2,4), (1,5), (1,3), (1,3), (1,3)]
 
-L = 4
-boat_shapes = [(1,4), (1,3)]
+L = 8
+boat_shapes = [(2,4), (1,5), (1,3), (1,3)]
 
 # L = 6
 # boat_shapes = [(2,4), (1,5), (1,3)]
+
+# L = 4
+# boat_shapes = [(1,4), (1,3)]
 
 # L = 3
 # boat_shapes = [(2,2)]
