@@ -91,18 +91,19 @@ class DQN(nn.Module):
 
 class Trainer:
 
-    def __init__(self, game_bound):
-        self.BATCH_SIZE = 128
-        self.GAMMA = 0.999
-        self.EPS_START = 0.99
-        self.EPS_END = 0.05
-        self.EPS_DECAY = 10000
-        self.TARGET_UPDATE = 100
-        self.UPDATE_PER_ROLLOUT = 20
-
-        self.num_episodes = 10000
-
-        self.game_bound = game_bound
+    def __init__(self, params):
+        self.BATCH_SIZE           = params["BATCH_SIZE"]
+        self.GAMMA                = params["GAMMA"]
+        self.EPS_START            = params["EPS_START"]
+        self.EPS_END              = params["EPS_END"]
+        self.EPS_DECAY            = params["EPS_DECAY"]
+        self.TARGET_UPDATE        = params["TARGET_UPDATE"]
+        self.UPDATE_PER_ROLLOUT   = params["UPDATE_PER_ROLLOUT"]
+        self.LEARNING_RATE        = params["LEARNING_RATE"]
+        self.REPLAY_SIZE          = params["REPLAY_SIZE"]
+        self.num_initial_episodes = params["num_initial_episodes"]
+        self.num_episodes         = params["num_episodes"]
+        self.game_bound           = params["game_bound"]
 
     def compute_epi(self, steps_done):
         e_s = self.EPS_START
@@ -145,19 +146,25 @@ class Trainer:
         optimizer.step()
 
 
-    def train(self, policy_net, target_net, env_maker, game_bnd, measure):
+    def train(self, policy_net, target_net, env_maker, measure):
         # policy_net = DQN().to(device)
         # target_net = DQN().to(device)
         target_net.load_state_dict(policy_net.state_dict())
         target_net.eval()
-        optimizer = optim.RMSprop(policy_net.parameters())
-        memory = ReplayMemory(10000)
+        optimizer = optim.RMSprop(policy_net.parameters(), lr = self.LEARNING_RATE)
+        memory = ReplayMemory(self.REPLAY_SIZE)
+
+        # collect a lot of initial random trace epi = 1
+        for i in range(self.num_initial_episodes):
+            trace = dqn_play_game(env_maker(), policy_net, self.game_bound, 1.0) 
+            for tr in trace:
+                memory.push(tr)
 
         for i_episode in range(self.num_episodes):
             epi = self.compute_epi(i_episode) 
 
             # collect trace
-            trace = dqn_play_game(env_maker(), policy_net, game_bnd, epi) 
+            trace = dqn_play_game(env_maker(), policy_net, self.game_bound, epi) 
             for tr in trace:
                 memory.push(tr)
 
@@ -169,12 +176,14 @@ class Trainer:
  
             # periodically bring target network up to date
             if i_episode % self.TARGET_UPDATE == 0:
+                print (" copying over to target network ! ! ! !")
                 target_net.load_state_dict(policy_net.state_dict())
 
             # periodically print out some diagnostics
             if i_episode % 100 == 0:
                 print (" ============== i t e r a t i o n ============= ", i_episode)
                 print (" episilon ", epi)
-                print (" measure ", measure(policy_net, game_bnd))
+                print (" measure ", measure(policy_net, self.game_bound))
+                print (" replay size ", len(memory))
 
 
