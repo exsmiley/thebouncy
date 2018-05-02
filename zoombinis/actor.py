@@ -119,6 +119,7 @@ def finish_episode(model, optimizer):
         advantage = r - value.data[0]
         policy_losses.append(-log_prob * advantage)
         value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([r]))))
+
     optimizer.zero_grad()
     loss = torch.stack(policy_losses).sum() + torch.stack(value_losses).sum()
     loss.backward()

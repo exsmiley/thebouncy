@@ -180,7 +180,7 @@ def measure(agent, game_bound):
 def run_policy_gradient():
   # r_actor = RandomActor(env.possible_actions)
   state_xform, action_xform = StateXform(), ActionXform()
-  ac_actor = PGAgent(state_xform, action_xform).cuda()
+  ac_actor = PGAgent(state_xform, action_xform).to(device)
   buff = Buffer(10000)
   game_bound = L*L*0.75
 

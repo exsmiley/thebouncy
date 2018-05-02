@@ -131,7 +131,11 @@ class MastermindEnv(object):
         self.guess_feedbacks = []
         self.won = False
         self.game = Mastermind()
+        self.forbidden = set()
         return 0, []
+
+    def forbid(self):
+        return self.forbidden
 
     def win(self):
         return self.won
@@ -140,7 +144,9 @@ class MastermindEnv(object):
         return self.won or len(self.guess_feedbacks) < 10
 
     def step(self, action):
-        feedback = self.game.guess(action)
+        guess = ALL_GUESSES[i]
+        self.forbidden.add(action)
+        feedback = self.game.guess(guess)
         self.won = self.game.is_winning_feedback(feedback)
         reward = 1 if self.won else 0
         self.guess_feedbacks.append((action, feedback))

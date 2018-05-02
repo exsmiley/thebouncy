@@ -20,8 +20,8 @@ def measure_dqn(agent, bnd):
 if __name__ == "__main__":
     print ("HEYA")
     state_xform, action_xform = StateXform(), ActionXform()
-    dqn_policy = DQN(state_xform, action_xform).cuda()
-    dqn_target = DQN(state_xform, action_xform).cuda()
+    dqn_policy = DQN(state_xform, action_xform).to(device)
+    dqn_target = DQN(state_xform, action_xform).to(device)
 
     game_bound = L*L*0.75
     trainer = Trainer(game_bound) 
