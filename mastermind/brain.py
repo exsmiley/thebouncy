@@ -210,42 +210,42 @@ class BrainAgent(object):
     def reset(self):
         self.made_moves = []
 
-    def act(self, x):
+    def act(self, x, forbid, det=False):
         if len(x) < self.num_random:
             move = random_guess()
             return tuple(move), {tuple(move): 1.0}
         state = self.state_xform.state_to_np(x)
 
 
-        pred = self.brain.get_probabilities(state)
-        split_pred = list(map(list, np.split(np.array(pred), 4)))
+        # pred = self.brain.get_probabilities(state)
+        # split_pred = list(map(list, np.split(np.array(pred), 4)))
 
-        guess = []
-        prob = 1
+        # guess = []
+        # prob = 1
 
-        for p in split_pred:
-            val = np.argmax(p)
-            prob *= p[val]
-            guess.append(val)
+        # for p in split_pred:
+        #     val = np.argmax(p)
+        #     prob *= p[val]
+        #     guess.append(val)
 
-        action = tuple(guess)
+        # action = tuple(guess)
 
-        # pred = self.brain.get_action_probabilities(state)
+        pred = self.brain.get_action_probabilities(state)
 
-        # for move in self.made_moves:
-        #     pred[move] = 0
+        for move in self.made_moves:
+            pred[move] = 0
 
-        # pred = np.array(pred)
+        pred = np.array(pred)
 
-        # pred = pred / sum(pred)
+        pred = pred / sum(pred)
 
-        # action = np.random.choice(range(NUM_ALL_GUESSES), p=pred)
-        # self.made_moves.append(action)
+        if det:
+            action = np.argmax(pred)
+        else:
+            action = np.random.choice(range(NUM_ALL_GUESSES), p=pred)
+        self.made_moves.append(action)
 
-        # pred = {i: p for i, p in enumerate(pred)}
-        # pred[tuple(self.action_xfrom.idx_to_action(action))] = pred[action]
-
-        return action, {action: prob}
+        return action, pred
 
 
 

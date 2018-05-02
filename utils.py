@@ -102,17 +102,22 @@ if __name__ == "__main__":
 
 import torch
 from torch.autograd import Variable
-def to_torch(x, req = False, cuda=True):
+
+# if gpu is to be used
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+use_cuda = device == "cuda"
+
+def to_torch(x, req = False, cuda=use_cuda):
   dtype = torch.cuda.FloatTensor if cuda else torch.FloatTensor
   x = Variable(torch.from_numpy(x).type(dtype), requires_grad = req)
   return x
 
-def to_torch_int(x, req = False, cuda=True):
+def to_torch_int(x, req = False, cuda=use_cuda):
   dtype = torch.cuda.LongTensor if cuda else torch.LongTensor
   x = Variable(torch.from_numpy(x).type(dtype), requires_grad = req)
   return x
 
-def to_torch_byte(x, req = False, cuda=True):
+def to_torch_byte(x, req = False, cuda=use_cuda):
   dtype = torch.cuda.ByteTensor if cuda else torch.ByteTensor
   x = Variable(torch.from_numpy(x).type(dtype), requires_grad = req)
   return x

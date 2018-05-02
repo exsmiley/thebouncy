@@ -13,7 +13,7 @@ import torchvision.transforms as T
 
 Tr = namedtuple('Tr', ('s', 'a', 'ss', 'r', 'last'))
 
-from utils import to_torch, to_torch_int, to_torch_byte
+from utils import to_torch, to_torch_int, to_torch_byte, device
 
 def dqn_play_game(env, actor, bnd, epi):
     '''
@@ -121,7 +121,7 @@ class Trainer:
                 for tr in transitions]))
         ss_batch = to_torch(np.array([policy_net.state_xform.state_to_np(tr.ss)\
                 for tr in transitions]))
-        fin_batch = torch.Tensor([tr.last for tr in transitions]).byte().cuda()
+        fin_batch = torch.Tensor([tr.last for tr in transitions]).byte().to(device)
 
         # Q[s,a]
         all_sa_values = policy_net(s_batch)
