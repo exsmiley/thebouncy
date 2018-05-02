@@ -11,11 +11,11 @@ from ac_agent import *
 from not_dqn import *
 
 # length of board
-# L = 10
-# boat_shapes = [(2,4), (1,5), (1,3), (1,3), (1,3)]
+L = 10
+boat_shapes = [(2,4), (1,5), (1,3), (1,3), (1,3)]
 
-L = 8
-boat_shapes = [(2,4), (1,5), (1,3), (1,3)]
+# L = 8
+# boat_shapes = [(2,4), (1,5), (1,3), (1,3)]
 
 # L = 6
 # boat_shapes = [(2,4), (1,5), (1,3)]
@@ -148,6 +148,8 @@ class StateXform:
     board_mask, board_truth = state
     ret =  np.concatenate((self.board_to_np(board_mask),\
                            self.board_to_np(board_truth)))
+    # ret =  np.concatenate((self.board_to_np(board_mask),\
+    #                        self.board_to_np(board_mask)))
     # ret =  self.board_to_np(board_mask)
     # ret =  self.board_to_np(board_mask)
     # ret =  self.board_to_np(board_truth)
