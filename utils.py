@@ -105,7 +105,7 @@ from torch.autograd import Variable
 
 # if gpu is to be used
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-use_cuda = device == "cuda"
+use_cuda = str(device) == "cuda"
 
 def to_torch(x, req = False, cuda=use_cuda):
   dtype = torch.cuda.FloatTensor if cuda else torch.FloatTensor
