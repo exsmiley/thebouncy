@@ -12,7 +12,10 @@ import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as T
 
+# transition
 Tr = namedtuple('Tr', ('s', 'a', 'ss', 'r', 'last'))
+# prediction data
+Pd = namedtuple('Pd', ('s_i', 's_t'))
 
 from utils import to_torch, to_torch_int, to_torch_byte, device
 
@@ -42,6 +45,13 @@ def dqn_play_game(env, actor, bnd, epi):
         s = ss
 
     return trace
+
+def get_oracle_training_data(trace):
+    ret = []
+    last_tr = trace[-1]
+    for tr in trace:
+        ret.append( Pd(tr.s, last_tr.ss) )
+    return ret
 
 def measure_dqn(env_class, agent, bnd):
     score = 0.0
@@ -186,7 +196,7 @@ class Trainer:
                     return
 
             # perform 
-            if len(memory) > self.BATCH_SIZE:
+            if len(memory) > self.BATCH_SIZE * 20:
                 for j_train in range(self.UPDATE_PER_ROLLOUT):
                     transitions = memory.sample(self.BATCH_SIZE)
                     self.optimize_model(policy_net, target_net, transitions, optimizer)
@@ -202,5 +212,56 @@ class Trainer:
                 print (" episilon ", epi)
                 print (" measure ", measure_dqn(env_maker, policy_net, self.game_bound))
                 print (" replay size ", len(memory))
+
+
+class JointTrainer(Trainer):
+
+    def __init__(self, params):
+        super(JointTrainer, self).__init__(params)
+        
+    def joint_train(self, policy_net, target_net, oracle, env_maker):
+        # policy_net = DQN().to(device)
+        # target_net = DQN().to(device)
+        target_net.load_state_dict(policy_net.state_dict())
+        target_net.eval()
+        policy_optimizer = optim.RMSprop(policy_net.parameters(), lr = self.LEARNING_RATE)
+        policy_memory = ReplayMemory(self.REPLAY_SIZE)
+        oracle_memory = ReplayMemory(self.REPLAY_SIZE)
+
+        for i_episode in tqdm.tqdm(range(self.num_episodes)):
+            epi = self.compute_epi(i_episode) 
+
+            # collect trace
+            trace = dqn_play_game(env_maker(), policy_net, self.game_bound, epi) 
+            for tr in trace:
+                policy_memory.push(tr)
+                if len(policy_memory) == policy_memory.capacity:
+                    print ("buffer is full")
+                    return
+            # compute oracle training data from trace and collect
+            oracle_data = get_oracle_training_data(trace)
+            for o_data in oracle_data:
+                oracle_memory.push(o_data)
+
+            # perform optimization
+            if len(policy_memory) > self.BATCH_SIZE * 20:
+                for j_train in range(self.UPDATE_PER_ROLLOUT):
+                    # optimize the policy network
+                    transitions = policy_memory.sample(self.BATCH_SIZE)
+                    self.optimize_model(policy_net, target_net, transitions, policy_optimizer)
+ 
+            # periodically bring target network up to date
+            if i_episode % self.TARGET_UPDATE == 0:
+                print (" copying over to target network ! ! ! !")
+                target_net.load_state_dict(policy_net.state_dict())
+
+            # periodically print out some diagnostics
+            if i_episode % 100 == 0:
+                print (" ============== i t e r a t i o n ============= ", i_episode)
+                print (" episilon ", epi)
+                print (" measure ", measure_dqn(env_maker, policy_net, self.game_bound))
+                print (" replay size ", len(policy_memory))
+
+
 
 
