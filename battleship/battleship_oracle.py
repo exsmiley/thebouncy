@@ -11,6 +11,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as T
+from battleship import L
 
 # make parent directory available
 import os,sys,inspect
@@ -18,20 +19,52 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 from utils import to_torch, to_torch_int, to_torch_byte, device
 
+# simple cross entropy cost (might be numerically unstable if pred has 0)
+def xentropy_cost(x_target, x_pred):
+    assert x_target.size() == x_pred.size(), \
+            "size fail ! "+str(x_target.size()) + " " + str(x_pred.size())
+    logged_x_pred = torch.log(x_pred)
+    cost_value = -torch.sum(x_target * logged_x_pred)
+    return cost_value
+
+def measure_oracle(oracle, oracle_datas):
+    total_score = 0
+    obtained_score = 0
+    for od in oracle_datas:
+        current_ob, target_ob = od.s_i, od.s_t
+        prediction = oracle.predict(current_ob)
+        target = oracle.future_xform.state_to_np(target_ob)
+        target = np.reshape(target, (L*L, 2))
+        argmax_pred = np.argmax(prediction, axis=1)
+        argmax_target = np.argmax(target, axis=1)
+
+        for jjj in range(len(target)):
+            if sum(target[jjj]) > 0:
+                total_score += 1
+                obtained_score += 1 if argmax_pred[jjj] == argmax_target[jjj] else 0
+    return obtained_score / total_score
+                
+
 class Oracle(nn.Module):
 
-    def __init__(self, state_xform, future_state_xform):
+    def __init__(self, state_xform, future_xform):
         super(Oracle, self).__init__()
 
-        assert 0, "#TODO"
-        state_length, action_length = state_xform.length, action_xform.length
-        self.state_xform, self.action_xform = state_xform, action_xform
+        state_length, future_length = state_xform.length, future_xform.length
+        self.state_xform, self.future_xform = state_xform, future_xform
 
         self.enc1  = nn.Linear(state_length, state_length * 10)
         self.bn1 = nn.BatchNorm1d(state_length * 10)
         self.enc2  = nn.Linear(state_length * 10, state_length * 10)
         self.bn2 = nn.BatchNorm1d(state_length * 10)
-        self.head = nn.Linear(state_length * 10, action_length)
+        self.head = nn.Linear(state_length * 10, future_length)
+
+        self.all_opt = torch.optim.RMSprop(self.parameters(), lr=0.001)
+
+    def predict(self, state):
+        state = to_torch(np.array([self.state_xform.state_to_np(state)]))
+        prediction = self(state).data.cpu().numpy()[0]
+        return prediction
 
     def forward(self, x):
         batch_size = x.size()[0]
@@ -39,50 +72,27 @@ class Oracle(nn.Module):
             return x if size == 1 else bn(x)
         x = optional_bn(self.enc1(x), self.bn1, batch_size)
         x = optional_bn(self.enc2(x), self.bn2, batch_size)
-        return self.head(x)
+        x = self.head(x)
+        x = x.view(-1, self.future_xform.n_obs, 2)
+        x = F.softmax(x, dim=2)
+        smol_const = to_torch(np.array([1e-6]))
+        x = x + smol_const.expand(x.size())
+        return x
 
-    def act(self, x, epi):
-        if random.random() < epi:
-            return random.choice(self.action_xform.possible_actions)
-        else:
-            with torch.no_grad():
-                x = self.state_xform.state_to_np(x)
-                x = to_torch(np.expand_dims(x,0))
-                q_values = self(x)
-                action_id = q_values.max(1)[1].data.cpu().numpy()[0]
-                return self.action_xform.idx_to_action(action_id)
+    def train(self, oracle_data):
 
-    def train_oracle(oracle_data):
+        s_batch = to_torch(np.array([self.state_xform.state_to_np(tr.s_i)\
+                for tr in oracle_data]))
+        f_batch = to_torch(np.array([self.future_xform.target_state_to_np(tr.s_t)\
+                for tr in oracle_data]))
 
-        s_batch = to_torch(np.array([policy_net.state_xform.state_to_np(tr.s)\
-                for tr in transitions]))
-        a_batch = to_torch_int(np.array([[policy_net.action_xform.action_to_idx(tr.a)]\
-                for tr in transitions]))
-        r_batch = to_torch(np.array([(tr.r)\
-                for tr in transitions]))
-        ss_batch = to_torch(np.array([policy_net.state_xform.state_to_np(tr.ss)\
-                for tr in transitions]))
-        fin_batch = torch.Tensor([tr.last for tr in transitions]).byte().to(device)
-
-        # Q[s,a]
-        all_sa_values = policy_net(s_batch)
-        sa_values = all_sa_values.gather(1, a_batch)
-
-        # V[ss] = max_a(Q[ss,a]) if ss not last_state else 0.0
-        all_ssa_values = target_net(ss_batch)
-        best_ssa_values = all_ssa_values.max(1)[0].detach()
-        ss_values = best_ssa_values.masked_fill_(fin_batch, 0.0)
-        
-        # Q-target[s,a] = reward[s,a] + discount * V[ss]
-        target_sa_values = r_batch + (ss_values * self.GAMMA)
-        # Compute Huber loss |Q[s,a] - Q-target[s,a]|
-        loss = F.smooth_l1_loss(sa_values, target_sa_values.unsqueeze(1))
-
+        future_prediction = self(s_batch)
+        loss = xentropy_cost(f_batch, future_prediction)
         # Optimize the model
-        optimizer.zero_grad()
+        self.all_opt.zero_grad()
         loss.backward()
-        for param in policy_net.parameters():
+        for param in self.parameters():
             param.grad.data.clamp_(-1, 1)
-        optimizer.step()
+        self.all_opt.step()
 
 

@@ -88,11 +88,11 @@ class DQN(nn.Module):
         state_length, action_length = state_xform.length, action_xform.length
         self.state_xform, self.action_xform = state_xform, action_xform
 
-        self.enc1  = nn.Linear(state_length, state_length * 10)
-        self.bn1 = nn.BatchNorm1d(state_length * 10)
-        self.enc2  = nn.Linear(state_length * 10, state_length * 10)
-        self.bn2 = nn.BatchNorm1d(state_length * 10)
-        self.head = nn.Linear(state_length * 10, action_length)
+        self.enc1  = nn.Linear(state_length, state_length * 20)
+        self.bn1 = nn.BatchNorm1d(state_length * 20)
+        self.enc2  = nn.Linear(state_length * 20, state_length * 20)
+        self.bn2 = nn.BatchNorm1d(state_length * 20)
+        self.head = nn.Linear(state_length * 20, action_length)
 
     def forward(self, x):
         batch_size = x.size()[0]
@@ -219,7 +219,7 @@ class JointTrainer(Trainer):
     def __init__(self, params):
         super(JointTrainer, self).__init__(params)
         
-    def joint_train(self, policy_net, target_net, oracle, env_maker):
+    def joint_train(self, policy_net, target_net, oracle, measure_oracle, env_maker):
         # policy_net = DQN().to(device)
         # target_net = DQN().to(device)
         target_net.load_state_dict(policy_net.state_dict())
@@ -249,6 +249,9 @@ class JointTrainer(Trainer):
                     # optimize the policy network
                     transitions = policy_memory.sample(self.BATCH_SIZE)
                     self.optimize_model(policy_net, target_net, transitions, policy_optimizer)
+                    # optimize the oracle
+                    oracle_datas = oracle_memory.sample(self.BATCH_SIZE)
+                    oracle.train(oracle_datas)
  
             # periodically bring target network up to date
             if i_episode % self.TARGET_UPDATE == 0:
@@ -260,8 +263,71 @@ class JointTrainer(Trainer):
                 print (" ============== i t e r a t i o n ============= ", i_episode)
                 print (" episilon ", epi)
                 print (" measure ", measure_dqn(env_maker, policy_net, self.game_bound))
+                if len(oracle_memory) > self.BATCH_SIZE:
+                    oracle_datas = oracle_memory.sample(self.BATCH_SIZE)
+                    print (" measure oracle", measure_oracle(oracle, oracle_datas))
                 print (" replay size ", len(policy_memory))
 
 
+    def pre_train(self, policy_net, target_net, oracle, measure_oracle, env_maker):
+        target_net.load_state_dict(policy_net.state_dict())
+        target_net.eval()
+        policy_optimizer = optim.RMSprop(policy_net.parameters(), lr = self.LEARNING_RATE)
+        policy_memory = ReplayMemory(self.REPLAY_SIZE)
+        oracle_memory = ReplayMemory(self.REPLAY_SIZE)
+
+        for _ in range(self.num_initial_episodes):
+            # pretrain oracle
+            trace = dqn_play_game(env_maker(), policy_net, self.game_bound, 1.0) 
+            # compute oracle training data from trace and collect
+            oracle_data = get_oracle_training_data(trace)
+            for o_data in oracle_data:
+                oracle_memory.push(o_data)
+            # perform optimization
+            if len(oracle_memory) > self.BATCH_SIZE * 20:
+                for j_train in range(self.UPDATE_PER_ROLLOUT):
+                    # optimize the oracle
+                    oracle_datas = oracle_memory.sample(self.BATCH_SIZE)
+                    oracle.train(oracle_datas)
+
+        for i_episode in tqdm.tqdm(range(self.num_episodes)):
+            epi = self.compute_epi(i_episode) 
+
+            # collect trace
+            trace = dqn_play_game(env_maker(), policy_net, self.game_bound, epi) 
+            for tr in trace:
+                policy_memory.push(tr)
+                if len(policy_memory) == policy_memory.capacity:
+                    print ("buffer is full")
+                    return
+            # compute oracle training data from trace and collect
+            oracle_data = get_oracle_training_data(trace)
+            for o_data in oracle_data:
+                oracle_memory.push(o_data)
+
+            # perform optimization
+            if len(policy_memory) > self.BATCH_SIZE * 20:
+                for j_train in range(self.UPDATE_PER_ROLLOUT):
+                    # optimize the policy network
+                    transitions = policy_memory.sample(self.BATCH_SIZE)
+                    self.optimize_model(policy_net, target_net, transitions, policy_optimizer)
+                    # optimize the oracle
+                    oracle_datas = oracle_memory.sample(self.BATCH_SIZE)
+                    oracle.train(oracle_datas)
+ 
+            # periodically bring target network up to date
+            if i_episode % self.TARGET_UPDATE == 0:
+                print (" copying over to target network ! ! ! !")
+                target_net.load_state_dict(policy_net.state_dict())
+
+            # periodically print out some diagnostics
+            if i_episode % 100 == 0:
+                print (" ============== i t e r a t i o n ============= ", i_episode)
+                print (" episilon ", epi)
+                print (" measure ", measure_dqn(env_maker, policy_net, self.game_bound))
+                if len(oracle_memory) > self.BATCH_SIZE:
+                    oracle_datas = oracle_memory.sample(self.BATCH_SIZE)
+                    print (" measure oracle", measure_oracle(oracle, oracle_datas))
+                print (" replay size ", len(policy_memory))
 
 

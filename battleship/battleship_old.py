@@ -7,10 +7,12 @@ import os,sys,inspect
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 from utils import *
+from ac_agent import *
+from not_dqn import *
 
 # length of board
-# L = 10
-# boat_shapes = [(2,4), (1,5), (1,3), (1,3), (1,3)]
+L = 10
+boat_shapes = [(2,4), (1,5), (1,3), (1,3), (1,3)]
 
 # L = 8
 # boat_shapes = [(2,4), (1,5), (1,3), (1,3)]
@@ -21,8 +23,8 @@ from utils import *
 # L = 4
 # boat_shapes = [(1,4), (1,3)]
 
-L = 3
-boat_shapes = [(2,2)]
+# L = 3
+# boat_shapes = [(2,2)]
 
 def get_board():
   total_mass = sum([x[0]*x[1] for x in boat_shapes])
@@ -133,27 +135,6 @@ class GameEnv(object):
 
 class StateXform:
   def __init__(self):
-    self.length = L*L*2
-    self.n_obs = L*L
-  def state_to_np(self, state):
-    ret = np.zeros(shape=(L*L,2), dtype=np.float32)
-    ret_idx = np.resize(state, L*L)
-    for i in range(L*L):
-      if int(ret_idx[i]) != 2:
-        ret[i, int(ret_idx[i])] = 1.0
-    ret = np.resize(ret, L*L*2)
-    return ret
-  def target_state_to_np(self, state):
-    ret = np.zeros(shape=(L*L,2), dtype=np.float32)
-    ret_idx = np.resize(state, L*L)
-    for i in range(L*L):
-      if int(ret_idx[i]) != 2:
-        ret[i, int(ret_idx[i])] = 1.0
-    ret = np.resize(ret, (L*L,2))
-    return ret
-
-class StateXformTruth:
-  def __init__(self):
     self.length = L*L*2 * 2
   def board_to_np(self, state):
     ret = np.zeros(shape=(L*L,2), dtype=np.float32)
@@ -167,27 +148,11 @@ class StateXformTruth:
     board_mask, board_truth = state
     ret =  np.concatenate((self.board_to_np(board_mask),\
                            self.board_to_np(board_truth)))
-    return ret
-
-class OracleXform:
-  def __init__(self, oracle):
-    self.length = L*L*2 * 2
-    self.oracle = oracle
-  def board_to_np(self, state):
-    ret = np.zeros(shape=(L*L,2), dtype=np.float32)
-    ret_idx = np.resize(state, L*L)
-    for i in range(L*L):
-      if int(ret_idx[i]) != 2:
-        ret[i, int(ret_idx[i])] = 1.0
-    ret = np.resize(ret, L*L*2)
-    return ret
-  def state_to_np(self, state):
-    board_mask, board_truth = state
-    board = self.board_to_np(board_mask)
-    oracle_prediction = self.oracle.predict(board_mask)
-    oracle_prediction = np.resize(oracle_prediction, L*L*2)
-    # ret =  np.concatenate((board, board))
-    ret =  np.concatenate((board, oracle_prediction))
+    # ret =  np.concatenate((self.board_to_np(board_mask),\
+    #                        self.board_to_np(board_mask)))
+    # ret =  self.board_to_np(board_mask)
+    # ret =  self.board_to_np(board_mask)
+    # ret =  self.board_to_np(board_truth)
     return ret
 
 class ActionXform:
@@ -202,4 +167,59 @@ class ActionXform:
     ret = np.zeros(L*L)
     ret[a] = 1.0
     return ret
+
+def measure(agent, game_bound):
+  score = 0.0
+  for i in range(100):
+    env = GameEnv()
+    trace = play_game(env, agent, game_bound, det=True)
+    score += sum([tr.r for tr in trace])
+
+  print ("# # # a deterministic trace # # # ")
+  for tr in trace:
+    print(tr.s)
+    print(tr.a, tr.r)
+    print(tr.v)
+  return score / 100
+
+def run_policy_gradient():
+  # r_actor = RandomActor(env.possible_actions)
+  state_xform, action_xform = StateXform(), ActionXform()
+  ac_actor = PGAgent(state_xform, action_xform).to(device)
+  buff = Buffer(10000)
+  game_bound = L*L*0.75
+
+  for i in range(1000000):
+    if i % 1000 == 0:
+      ac_actor.explore *= 0.95
+      print ("explor rate ", ac_actor.explore)
+      print (" ================= MEASURE  :  ", measure(ac_actor, game_bound))
+
+    env = GameEnv()
+    trace = play_game(env, ac_actor, game_bound)
+    disc_trace = get_discount_trace(trace, ac_actor.value_estimator)
+    [buff.add(tr) for tr in disc_trace]
+    tr_sample = [buff.sample() for _ in range(50)]
+    ac_actor.learn(tr_sample)
+
+def run_table_q():
+  action_xform = ActionXform()
+  q_actor = TDLearn(action_xform)
+  buff = Buffer(10000)
+  game_bound = L*L*0.75
+
+  for i in range(1000000):
+    if i % 100 == 0:
+      print (" ================= MEASURE  :  ", measure(q_actor, game_bound))
+      print (" state size ", len(q_actor.Q))
+      # print (" everything ? ", q_actor.Q)
+    env = GameEnv()
+    trace = play_game(env, q_actor, game_bound)
+    [buff.add(tr) for tr in trace]
+    tr_sample = [buff.sample() for _ in range(50)]
+    q_actor.learn(tr_sample)
+
+if __name__ == "__main__":
+  run_table_q()
+
 

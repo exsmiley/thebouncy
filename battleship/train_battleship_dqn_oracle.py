@@ -8,13 +8,15 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 from dqn import *
 from battleship import *
+from battleship_oracle import *
 
 if __name__ == "__main__":
     print ("HEYA")
     state_xform, action_xform = StateXform(), ActionXform()
-    dqn_policy = DQN(state_xform, action_xform).to(device)
-    dqn_target = DQN(state_xform, action_xform).to(device)
-    oracle = None
+    oracle = Oracle(state_xform, state_xform).to(device)
+    oracle_xform = OracleXform(oracle)
+    dqn_policy = DQN(oracle_xform, action_xform).to(device)
+    dqn_target = DQN(oracle_xform, action_xform).to(device)
 
     params = {
             "BATCH_SIZE" : 128,
@@ -26,10 +28,10 @@ if __name__ == "__main__":
             "UPDATE_PER_ROLLOUT" : 5,
             "LEARNING_RATE" : 0.001,
             "REPLAY_SIZE" : 1000000 ,
-            "num_initial_episodes" : 100,
+            "num_initial_episodes" : 1000,
             "num_episodes" : 100000,
             "game_bound" : L*L*0.75,
             }
 
     trainer = JointTrainer(params)
-    trainer.joint_train(dqn_policy, dqn_target, oracle, GameEnv)
+    trainer.pre_train(dqn_policy, dqn_target, oracle, measure_oracle, GameEnv)
