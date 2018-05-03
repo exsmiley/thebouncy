@@ -18,11 +18,11 @@ from utils import *
 # L = 6
 # boat_shapes = [(2,4), (1,5), (1,3)]
 
-# L = 4
-# boat_shapes = [(1,4), (1,3)]
+L = 4
+boat_shapes = [(1,4), (1,3)]
 
-L = 3
-boat_shapes = [(2,2)]
+# L = 3
+# boat_shapes = [(2,2)]
 
 def get_board():
   total_mass = sum([x[0]*x[1] for x in boat_shapes])

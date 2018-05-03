@@ -83,16 +83,16 @@ class ReplayMemory(object):
 
 class DQN(nn.Module):
 
-    def __init__(self, state_xform, action_xform):
+    def __init__(self, state_xform, action_xform, n_hidden):
         super(DQN, self).__init__()
         state_length, action_length = state_xform.length, action_xform.length
         self.state_xform, self.action_xform = state_xform, action_xform
 
-        self.enc1  = nn.Linear(state_length, state_length * 20)
-        self.bn1 = nn.BatchNorm1d(state_length * 20)
-        self.enc2  = nn.Linear(state_length * 20, state_length * 20)
-        self.bn2 = nn.BatchNorm1d(state_length * 20)
-        self.head = nn.Linear(state_length * 20, action_length)
+        self.enc1  = nn.Linear(state_length, n_hidden)
+        self.bn1 = nn.BatchNorm1d(n_hidden)
+        self.enc2  = nn.Linear(n_hidden, n_hidden)
+        self.bn2 = nn.BatchNorm1d(n_hidden)
+        self.head = nn.Linear(n_hidden, action_length)
 
     def forward(self, x):
         batch_size = x.size()[0]
@@ -276,7 +276,8 @@ class JointTrainer(Trainer):
         policy_memory = ReplayMemory(self.REPLAY_SIZE)
         oracle_memory = ReplayMemory(self.REPLAY_SIZE)
 
-        for _ in range(self.num_initial_episodes):
+        print ("pretraining oracle . . . ")
+        for _ in tqdm.tqdm(range(self.num_initial_episodes)):
             # pretrain oracle
             trace = dqn_play_game(env_maker(), policy_net, self.game_bound, 1.0) 
             # compute oracle training data from trace and collect
