@@ -61,6 +61,12 @@ def measure_dqn(env_class, agent, bnd):
         score += sum([tr.r for tr in trace])
     print ("a trace in measure ")
     print ([tr.a for tr in trace])
+    # print ("q values ")
+    # for tr in trace:
+    #     print ("-----------------")
+    #     print (tr.s[0])
+    #     print (agent.get_Q(tr.s))
+    #     print (tr.a)
     return score / 100
 
 class ReplayMemory(object):
@@ -91,18 +97,22 @@ class DQN(nn.Module):
         self.state_xform, self.action_xform = state_xform, action_xform
 
         self.enc1  = nn.Linear(state_length, n_hidden)
-        self.bn1 = nn.BatchNorm1d(n_hidden)
+        # self.bn1 = nn.BatchNorm1d(n_hidden)
         self.enc2  = nn.Linear(n_hidden, n_hidden)
-        self.bn2 = nn.BatchNorm1d(n_hidden)
+        # self.bn2 = nn.BatchNorm1d(n_hidden)
         self.head = nn.Linear(n_hidden, action_length)
 
     def forward(self, x):
         batch_size = x.size()[0]
-        def optional_bn(x, bn, size):
-            return x if size == 1 else bn(x)
-        x = optional_bn(self.enc1(x), self.bn1, batch_size)
-        x = optional_bn(self.enc2(x), self.bn2, batch_size)
+        x = self.enc2(self.enc1(x))
         return self.head(x)
+
+    def get_Q(self, x):
+        with torch.no_grad():
+            x = self.state_xform.state_to_np(x)
+            x = to_torch(np.expand_dims(x,0))
+            q_values = self.forward(x)
+            return q_values
 
     def act(self, x, epi):
         if random.random() < epi:
@@ -164,6 +174,12 @@ class Trainer:
         # Compute Huber loss |Q[s,a] - Q-target[s,a]|
         loss = F.smooth_l1_loss(sa_values, target_sa_values.unsqueeze(1))
 
+        # if random.random() < 0.001:
+        #     print ("================================================== HEY RANDOM ! ")
+        #     print (all_sa_values)
+        #     print (policy_net.get_Q(transitions[0].s))
+        #     print ("xxx in training s[batch[0]]")
+        #     print (s_batch[0])
         # Optimize the model
         optimizer.zero_grad()
         loss.backward()
@@ -194,9 +210,9 @@ class Trainer:
             trace = dqn_play_game(env_maker(), policy_net, self.game_bound, epi) 
             for tr in trace:
                 memory.push(tr)
-                if len(memory) == memory.capacity:
-                    print ("buffer is full")
-                    return
+                # if len(memory) == memory.capacity:
+                #     print ("buffer is full")
+                #     return
 
             # perform 
             if len(memory) > self.BATCH_SIZE * 20:
@@ -302,9 +318,9 @@ class JointTrainer(Trainer):
             trace = dqn_play_game(env_maker(), policy_net, self.game_bound, epi) 
             for tr in trace:
                 policy_memory.push(tr)
-                if len(policy_memory) == policy_memory.capacity:
-                    print ("buffer is full")
-                    return
+                # if len(policy_memory) == policy_memory.capacity:
+                #     print ("buffer is full")
+                #     return
             # compute oracle training data from trace and collect
             oracle_data = get_oracle_training_data(trace)
             for o_data in oracle_data:
