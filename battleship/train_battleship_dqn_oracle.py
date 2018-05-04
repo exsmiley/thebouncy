@@ -38,7 +38,7 @@ if __name__ == "__main__":
             "UPDATE_PER_ROLLOUT" : 10,
             "LEARNING_RATE" : 0.001,
             "REPLAY_SIZE" : 1000000 ,
-            "num_initial_episodes" : 00,
+            "num_initial_episodes" : 500,
             "num_episodes" : 1500,
             "game_bound" : L*L*0.75,
             }
