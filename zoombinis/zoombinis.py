@@ -414,7 +414,7 @@ class Oracle(nn.Module):
 
     def predict(self, state):
         state, _, _ = state
-        state = Variable(torch.FloatTensor(state).view(-1, BRAIN_INPUT_LENGTH))
+        state = Variable(torch.FloatTensor(state).to(device).view(-1, BRAIN_INPUT_LENGTH))
         vecs = self.forward(state).data.numpy()[0]
         
         for i in range(0, len(vecs), NUM_BRIDGES):
