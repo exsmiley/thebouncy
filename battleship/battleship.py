@@ -114,9 +114,9 @@ class GameEnv(object):
     if (self.board[y][x] == 1 and (x,y) not in self.made_moves):
       return 1.0
     # return 1.0
-    if (x,y) in self.made_moves:
-      return -1.0
-    return -1.0
+    # if (x,y) in self.made_moves:
+    #   return -1.0
+    return -0.1
 
   # def get_final_reward(self):
   #   return len(self.occupied.intersection(self.made_moves))
@@ -171,7 +171,7 @@ class StateXformTruth:
 
 class OracleXform:
   def __init__(self, oracle):
-    self.length = L*L*2 * 2
+    self.length = L*L*2
     self.oracle = oracle
   def board_to_np(self, state):
     ret = np.zeros(shape=(L*L,2), dtype=np.float32)
@@ -179,15 +179,19 @@ class OracleXform:
     for i in range(L*L):
       if int(ret_idx[i]) != 2:
         ret[i, int(ret_idx[i])] = 1.0
-    ret = np.resize(ret, L*L*2)
     return ret
   def state_to_np(self, state):
     board_mask, board_truth = state
     board = self.board_to_np(board_mask)
     oracle_prediction = self.oracle.predict(board_mask)
-    oracle_prediction = np.resize(oracle_prediction, L*L*2)
-    # ret =  np.concatenate((board, board))
-    ret =  np.concatenate((board, oracle_prediction))
+    ret = []
+    for i in range(len(board)):
+        if np.sum(board[i]) > 0:
+            ret.append(board[i])
+        else:
+            ret.append(oracle_prediction[i])
+    ret = np.array(ret)
+    ret = np.resize(ret, L*L*2)
     return ret
 
 class ActionXform:

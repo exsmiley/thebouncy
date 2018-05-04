@@ -47,17 +47,17 @@ def measure_oracle(oracle, oracle_datas):
 
 class Oracle(nn.Module):
 
-    def __init__(self, state_xform, future_xform):
+    def __init__(self, state_xform, future_xform, n_hidden):
         super(Oracle, self).__init__()
 
         state_length, future_length = state_xform.length, future_xform.length
         self.state_xform, self.future_xform = state_xform, future_xform
 
-        self.enc1  = nn.Linear(state_length, state_length * 10)
-        self.bn1 = nn.BatchNorm1d(state_length * 10)
-        self.enc2  = nn.Linear(state_length * 10, state_length * 10)
-        self.bn2 = nn.BatchNorm1d(state_length * 10)
-        self.head = nn.Linear(state_length * 10, future_length)
+        self.enc1  = nn.Linear(state_length, n_hidden)
+        self.bn1 = nn.BatchNorm1d(n_hidden)
+        self.enc2  = nn.Linear(n_hidden, n_hidden)
+        self.bn2 = nn.BatchNorm1d(n_hidden, n_hidden)
+        self.head = nn.Linear(n_hidden, future_length)
 
         self.all_opt = torch.optim.RMSprop(self.parameters(), lr=0.001)
 
