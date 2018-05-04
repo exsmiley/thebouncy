@@ -9,14 +9,18 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from dqn import *
 from zoombinis import *
 
-def measure_dqn(agent, bnd):
-  return measure_dqn_reward(GameEnv, agent, bnd)
 
 if __name__ == "__main__":
-    print ("HEYA")
-    state_xform, action_xform = StateXform(), ActionXform()
-    dqn_policy = DQN(state_xform, action_xform).to(device)
-    dqn_target = DQN(state_xform, action_xform).to(device)
+    print ("ZOOMINIIIISSSSSS")
+    n_hidden = 128
+    state_xform, action_xform, future_xform = StateXform(), ActionXform(), FutureXform()
+
+    oracle = Oracle(state_xform, future_xform, n_hidden).to(device)
+    oracle_xform = OracleXform(oracle)
+
+    dqn_policy = DQN(oracle_xform, action_xform, n_hidden).to(device)
+    dqn_target = DQN(oracle_xform, action_xform, n_hidden).to(device)
+    
 
     params = {
         "BATCH_SIZE" : 128,
@@ -32,5 +36,5 @@ if __name__ == "__main__":
         "num_episodes" : 100000,
         "game_bound" : 20,
         }
-    trainer = Trainer(params) 
-    trainer.train(dqn_policy, dqn_target, GameEnv)
+    trainer = JointTrainer(params)
+    trainer.pre_train(dqn_policy, dqn_target, oracle, measure_oracle, GameEnv)

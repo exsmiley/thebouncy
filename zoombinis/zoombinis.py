@@ -3,6 +3,18 @@ import numpy as np
 import itertools
 import functools
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.autograd import Variable
+
+# make parent directory available
+import os,sys,inspect
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+
+from utils import *
+
 
 NUM_ZOOMBINIS = 16
 MAX_MISTAKES = 6
@@ -306,7 +318,7 @@ class GameEnv(object):
         self.game = game if game else Game()
         self.actions = set()
         self.truth = self.game.get_brain_truth()
-        return np.array(self.game.get_agent_state()), self.truth
+        return np.array(self.game.get_brain_state()), self.truth, self.game.get_mask_truth()
 
     def win(self):
         return self.game.has_won()
@@ -322,52 +334,55 @@ class GameEnv(object):
 
         passed = self.game.send_zoombini(zoombini, bridge)
 
-        state = np.array(self.game.get_agent_state())#.reshape(1, -1)
+        state = np.array(self.game.get_brain_state())#.reshape(1, -1)
         reward = 1 if passed else 0
         done = not self.game.can_move()
 
-        state = state, self.truth
+        state = state, self.truth, self.game.get_mask_truth()
 
-        # if verbose:
-        #     passed_str = 'PASSED' if passed else 'failed'
-        #     print('Sending Zoombini {} to {} and it {}'.format(zoombini, bridge, passed_str))
-        # if reward_shaper:
-        #     if already_passed:
-        #         reward2 = 0
-        #     else:
-        #         reward2 = reward_shaper.get_reward(self.game.get_brain_state(), action)
-        #     return state, reward, done, reward2
-        # else:
         return state, reward, done
-
-    # def check_valid_move(self, action):
-    #     zoombini = action//NUM_BRIDGES
-    #     return not self.game.zoombinis[zoombini].has_passed
 
     def forbid(self):
         return self.game.get_invalid_moves()
 
 class StateXform:
   def __init__(self):
-    # self.length = L*L*2 * 2
-    self.length = AGENT_INPUT_LENGTH + OUTPUT_LENGTH
-  def board_to_np(self, state):
-    return state
-    # ret = np.zeros(shape=(L*L,2), dtype=np.float32)
-    # ret_idx = np.resize(state, L*L)
-    # for i in range(L*L):
-    #   if int(ret_idx[i]) != 2:
-    #     ret[i, int(ret_idx[i])] = 1.0
-    # ret = np.resize(ret, L*L*2)
-    # return ret
+    self.length = BRAIN_INPUT_LENGTH
+
   def state_to_np(self, state):
-    board_mask, board_truth = state
-    ret =  np.concatenate((self.board_to_np(board_mask),\
-                           self.board_to_np(board_truth)))
-    # ret =  self.board_to_np(board_mask)
-    # ret =  self.board_to_np(board_mask)
-    # ret =  self.board_to_np(board_truth)
+    board_mask, _, _ = state
+    # ret =  np.concatenate((board_mask, mask_truth))
+    return np.array(board_mask)
+
+class StateXformTruth:
+  def __init__(self):
+    self.length = BRAIN_INPUT_LENGTH + OUTPUT_LENGTH
+
+  def state_to_np(self, state):
+    board_mask, board_truth, _ = state
+    ret =  np.concatenate((board_mask, board_truth))
     return ret
+
+class OracleXform:
+    def __init__(self, oracle):
+        self.length = BRAIN_INPUT_LENGTH + OUTPUT_LENGTH
+        self.oracle = oracle
+
+    def state_to_np(self, state):
+        board_mask, _, _ = state
+        oracle_prediction = self.oracle.predict(state)
+        ret =  np.concatenate((board_mask, oracle_prediction))
+
+        return ret
+
+class FutureXform:
+    def __init__(self):
+        self.length = OUTPUT_LENGTH
+
+    def state_to_np(self, state):
+        _, _, mask_and_truth = state
+
+        return mask_and_truth
 
 class ActionXform:
   def __init__(self):
@@ -381,6 +396,83 @@ class ActionXform:
     ret = np.zeros(self.length)
     ret[a] = 1.0
     return ret
+
+
+class Oracle(nn.Module):
+
+    def __init__(self, state_xform, future_xform, n_hidden):
+        super(Oracle, self).__init__()
+
+        state_length, future_length = state_xform.length, future_xform.length
+        self.state_xform, self.future_xform = state_xform, future_xform
+
+        self.fc1 = nn.Linear(BRAIN_INPUT_LENGTH, n_hidden)
+        self.fc2 = nn.Linear(n_hidden, OUTPUT_LENGTH)
+
+        self.criterion = nn.BCELoss()
+        self.optimizer = optim.Adam(self.parameters(), lr=1e-3)
+
+    def predict(self, state):
+        state, _, _ = state
+        state = Variable(torch.FloatTensor(state).to(device).view(-1, BRAIN_INPUT_LENGTH))
+        vecs = self.forward(state).cpu().data.numpy()[0]
+        
+        for i in range(0, len(vecs), NUM_BRIDGES):
+            total = 0
+            for j in range(i, i+NUM_BRIDGES):
+                total += vecs[j]
+            for j in range(i, i+NUM_BRIDGES):
+                vecs[j] /= total
+
+        return list(vecs)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return F.sigmoid(x)
+
+    def train(self, oracle_data):
+        s_batch = to_torch(np.array([self.state_xform.state_to_np(tr.s_i)\
+                for tr in oracle_data]))
+        mask_and_truth = [self.future_xform.state_to_np(tr.s_t)\
+                for tr in oracle_data]
+        f_batch = to_torch(np.array([np.array(m)*np.array(t) for (m,t) in mask_and_truth]))
+
+        future_prediction = self(s_batch)
+
+        # Optimize the model
+        self.optimizer.zero_grad()
+        loss = self.criterion(future_prediction, f_batch)
+        loss.backward()
+        self.optimizer.step()
+
+def measure_oracle(oracle, oracle_datas):
+    total_score = 0
+    obtained_score = 0
+    for od in oracle_datas:
+        current_ob, target_ob = od.s_i, od.s_t
+        prediction = np.array(oracle.predict(current_ob))
+        target, mask = oracle.future_xform.state_to_np(target_ob)
+        omitted_score = (len(mask)-sum(mask))//2
+        prediction = prediction*np.array(mask)
+        target = np.array(target)*np.array(mask)
+        prediction = np.reshape(prediction, (OUTPUT_LENGTH//2, 2))
+        target = np.reshape(target, (OUTPUT_LENGTH//2, 2))
+        argmax_pred = np.argmax(prediction, axis=1)
+        argmax_target = np.argmax(target, axis=1)
+
+        for (pred, target) in zip(argmax_pred, argmax_target):
+            total_score += 1
+            if pred == target:
+                obtained_score += 1
+
+        # don't give it a benefit for masked scores
+        total_score -= omitted_score
+        obtained_score -= omitted_score
+
+    return obtained_score / total_score
+
+
 
 if __name__ == '__main__':
     g = Game()
