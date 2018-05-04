@@ -468,7 +468,7 @@ def measure_oracle(oracle, oracle_datas):
 
         # don't give it a benefit for masked scores
         total_score -= omitted_score
-        obtained_score -= obtained_score
+        obtained_score -= omitted_score
 
     return obtained_score / total_score
 
