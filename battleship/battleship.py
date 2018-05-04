@@ -171,7 +171,7 @@ class StateXformTruth:
 
 class OracleXform:
   def __init__(self, oracle):
-    self.length = L*L*2
+    self.length = L*L*3
     self.oracle = oracle
   def board_to_np(self, state):
     ret = np.zeros(shape=(L*L,2), dtype=np.float32)
@@ -187,11 +187,11 @@ class OracleXform:
     ret = []
     for i in range(len(board)):
         if np.sum(board[i]) > 0:
-            ret.append(board[i])
+            ret.append(np.concatenate((board[i], np.array([1.0]))))
         else:
-            ret.append(oracle_prediction[i])
+            ret.append(np.concatenate((oracle_prediction[i], np.array([0.0]))))
     ret = np.array(ret)
-    ret = np.resize(ret, L*L*2)
+    ret = np.resize(ret, L*L*3)
     return ret
 
 class ActionXform:
