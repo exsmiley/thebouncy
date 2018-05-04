@@ -26,7 +26,7 @@ if USE_OLD or not TO_TRAIN:
 
 class Brain(nn.Module):
 
-    def __init__(self, chkpt=None):
+    def __init__(self, chkpt=None, ):
         super(Brain, self).__init__()
 
         self.fc1 = nn.Linear(BRAIN_INPUT_LENGTH, 128)
@@ -64,6 +64,9 @@ class Brain(nn.Module):
                 vecs[j] /= total
 
         return list(vecs)
+
+    def predict(self, state):
+        return self.get_probabilities(state)
 
     def get_probabilities_total(self, state, known):
         state2 = Variable(torch.FloatTensor(state).view(-1, BRAIN_INPUT_LENGTH))
@@ -108,6 +111,9 @@ class Brain(nn.Module):
     def save(self, name='models/brain'):
         torch.save(self.state_dict(), name)
         print('Saved model to {}!'.format(name))
+
+    def train(self, traces):
+        pass
 
 
 class BrainTrainer(object):
