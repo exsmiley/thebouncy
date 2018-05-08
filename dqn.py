@@ -33,7 +33,7 @@ def dqn_play_game(env, actor, bnd, epi):
     i_iter = 0
 
     while not done:
-        action = actor.act(s, epi)
+        action = actor.act(s, env.forbid(), epi)
         ss, r, done = env.step(action)
         # set a bound on the number of turns
         i_iter += 1
@@ -114,15 +114,19 @@ class DQN(nn.Module):
             q_values = self.forward(x)
             return q_values
 
-    def act(self, x, epi):
+    def act(self, x, forbid, epi):
         if random.random() < epi:
-            return random.choice(self.action_xform.possible_actions)
+            without_forbid = set(self.action_xform.possible_actions).difference(forbid)
+            return random.choice(list(without_forbid))
         else:
             with torch.no_grad():
                 x = self.state_xform.state_to_np(x)
                 x = to_torch(np.expand_dims(x,0))
                 q_values = self(x)
-                action_id = q_values.max(1)[1].data.cpu().numpy()[0]
+                q_values_np = q_values.data.cpu().numpy()[0]
+                for forbid_idx in forbid:
+                    q_values_np[forbid_idx] = -99999
+                action_id = np.argmax(q_values_np)
                 return self.action_xform.idx_to_action(action_id)
 
 class Trainer:
@@ -346,9 +350,9 @@ class JointTrainer(Trainer):
                 print (" ============== i t e r a t i o n ============= ", i_episode)
                 print (" episilon ", epi)
                 print (" - - - - - - - - - - - measure ", measure_dqn(env_maker, policy_net, self.game_bound))
-                if len(oracle_memory) > self.BATCH_SIZE:
-                    oracle_datas = oracle_memory.sample(self.BATCH_SIZE)
-                    print (" - - - - - - - - - - measure oracle", measure_oracle(oracle, oracle_datas))
+                # if len(oracle_memory) > self.BATCH_SIZE:
+                #     oracle_datas = oracle_memory.sample(self.BATCH_SIZE)
+                #     print (" - - - - - - - - - - measure oracle", measure_oracle(oracle, oracle_datas))
                 print (" replay size ", len(policy_memory))
                 print (" Q loss ", q_loss)
 

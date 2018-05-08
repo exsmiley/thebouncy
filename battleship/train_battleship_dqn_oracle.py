@@ -16,14 +16,14 @@ if __name__ == "__main__":
     truth_xform = StateXformTruth()
     n_hidden = 1000
 
-    oracle = Oracle(state_xform, state_xform, n_hidden).to(device)
+    oracle = Oracle(state_xform, truth_xform, n_hidden).to(device)
     oracle_xform = OracleXform(oracle)
 
-    # dqn_policy = DQN(state_xform, action_xform, n_hidden).to(device)
-    # dqn_target = DQN(state_xform, action_xform, n_hidden).to(device)
+    dqn_policy = DQN(state_xform, action_xform, n_hidden).to(device)
+    dqn_target = DQN(state_xform, action_xform, n_hidden).to(device)
 
-    dqn_policy = DQN(oracle_xform, action_xform, n_hidden).to(device)
-    dqn_target = DQN(oracle_xform, action_xform, n_hidden).to(device)
+    # dqn_policy = DQN(oracle_xform, action_xform, n_hidden).to(device)
+    # dqn_target = DQN(oracle_xform, action_xform, n_hidden).to(device)
 
     # dqn_policy = DQN(truth_xform, action_xform, n_hidden).to(device)
     # dqn_target = DQN(truth_xform, action_xform, n_hidden).to(device)
@@ -38,7 +38,7 @@ if __name__ == "__main__":
             "UPDATE_PER_ROLLOUT" : 10,
             "LEARNING_RATE" : 0.001,
             "REPLAY_SIZE" : 200000 ,
-            "num_initial_episodes" : 500,
+            "num_initial_episodes" : 100,
             "num_episodes" : 5500,
             "game_bound" : L*L*0.75,
             }

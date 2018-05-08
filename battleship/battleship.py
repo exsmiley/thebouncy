@@ -16,6 +16,7 @@ from utils import *
 # boat_shapes = [(2,4), (1,5), (1,3), (1,3)]
 
 L = 6 # score of 16 max
+# boat_shapes = [(1,6)]
 boat_shapes = [(2,4), (1,5), (1,3)]
 
 # L = 4 # score of 7 max
@@ -155,6 +156,7 @@ class StateXform:
 class StateXformTruth:
   def __init__(self):
     self.length = L*L*2 * 2
+    self.n_obs = L*L
   def board_to_np(self, state):
     ret = np.zeros(shape=(L*L,2), dtype=np.float32)
     ret_idx = np.resize(state, L*L)
@@ -163,6 +165,10 @@ class StateXformTruth:
         ret[i, int(ret_idx[i])] = 1.0
     ret = np.resize(ret, L*L*2)
     return ret
+  def truth_to_np(self, state):
+    board_mask, board_truth = state
+    ret = self.board_to_np(board_truth)
+    return np.resize(ret, (L*L, 2))
   def state_to_np(self, state):
     board_mask, board_truth = state
     ret =  np.concatenate((self.board_to_np(board_mask),\
@@ -182,10 +188,10 @@ class OracleXform:
     return ret
 
   def harden(self, a_pred):
-    if a_pred[0] > a_pred[1] + 0.2:
-      return np.array([1.0, 0.0])
-    if a_pred[1] > apred[0] + 0.2:
+    if a_pred[0] > a_pred[1] + 0.6:
       return np.array([0.0, 1.0])
+    if a_pred[1] > a_pred[0] + 0.6:
+      return np.array([1.0, 0.0])
     return np.array([0.0, 0.0])
   def state_to_np(self, state):
     board_mask, board_truth = state
@@ -196,11 +202,17 @@ class OracleXform:
         if np.sum(board[i]) > 0:
             ret.append(np.concatenate((board[i], np.array([1.0]))))
         else:
-            ret.append(np.concatenate((self.harden(oracle_prediction[i]), 
+            ret.append(np.concatenate((oracle_prediction[i], 
                                        np.array([0.0]))))
     ret = np.array(ret)
     ret = np.resize(ret, L*L*3)
     return ret
+  def get_oracle(self, state):
+    board_mask, board_truth = state
+    return self.oracle.predict(board_mask)
+  def get_truth(self, state):
+    board_mask, board_truth = state
+    return board_truth
 
 class ActionXform:
   def __init__(self):

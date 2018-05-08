@@ -28,38 +28,63 @@ def xentropy_cost(x_target, x_pred):
     return cost_value
 
 def measure_oracle(oracle, oracle_datas):
-    total_score = 0
-    obtained_score = 0
-    for od in oracle_datas:
-        current_ob, target_ob = od.s_i, od.s_t
-        prediction = oracle.predict(current_ob)
-        target = oracle.future_xform.state_to_np(target_ob)
-        target = np.reshape(target, (L*L, 2))
-        argmax_pred = np.argmax(prediction, axis=1)
-        argmax_target = np.argmax(target, axis=1)
+    np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
 
-        for jjj in range(len(target)):
-            if sum(target[jjj]) > 0:
-                total_score += 1
-                obtained_score += 1 if argmax_pred[jjj] == argmax_target[jjj] else 0
-    return obtained_score / total_score
+    total_err = 0
+    for od in oracle_datas:
+        ob_i, truth_i = od
+
+        for ii in range(L):
+            for jj in range(L):
+                if ob_i[ii][jj] != 2:
+                    assert ob_i[ii][jj] == truth_i[ii][jj], "inconsistent ob"
+
+
+        prediction = oracle.predict(od)
+
+        # print ("input ")
+        # print (ob_i)
+
+        # print ("prediction ")
+        pred = np.reshape(prediction[:,1], (L,L))
+        # print (pred)
+
+        # print ("target ")
+        # print (truth_i)
+
+        error = np.abs(pred - truth_i)
+        # print ("error " )
+        error = np.sum(error)
+        # print (error)
+
+        total_err += error
+    return total_err / len(oracle_datas) / (L * L)
                 
+def consistency_check(oracle_data):
+    for tr in oracle_data:
+        ins = tr.s_i
+        out = tr.s_t
+        ob_i, truth_i = ins
+        ob_t, truth_t = out
+        assert (np.sum(truth_i == truth_t)) == L*L, "truth is wrong"
+        for ii in range(L):
+            for jj in range(L):
+                if ob_i[ii][jj] != 2:
+                    assert ob_i[ii][jj] == truth_i[ii][jj], "inconsistent ob"
 
 class Oracle(nn.Module):
 
     def __init__(self, state_xform, future_xform, n_hidden):
         super(Oracle, self).__init__()
 
-        state_length, future_length = state_xform.length, future_xform.length
+        state_length, future_length = state_xform.length, L*L*2
         self.state_xform, self.future_xform = state_xform, future_xform
 
         self.enc1  = nn.Linear(state_length, n_hidden)
-        self.bn1 = nn.BatchNorm1d(n_hidden)
         self.enc2  = nn.Linear(n_hidden, n_hidden)
-        self.bn2 = nn.BatchNorm1d(n_hidden, n_hidden)
         self.head = nn.Linear(n_hidden, future_length)
 
-        self.all_opt = torch.optim.RMSprop(self.parameters(), lr=0.001)
+        self.all_opt = torch.optim.RMSprop(self.parameters(), lr=0.0001)
 
     def predict(self, state):
         state = to_torch(np.array([self.state_xform.state_to_np(state)]))
@@ -68,10 +93,7 @@ class Oracle(nn.Module):
 
     def forward(self, x):
         batch_size = x.size()[0]
-        def optional_bn(x, bn, size):
-            return x if size == 1 else bn(x)
-        x = optional_bn(self.enc1(x), self.bn1, batch_size)
-        x = optional_bn(self.enc2(x), self.bn2, batch_size)
+        x = self.enc2(self.enc1(x))
         x = self.head(x)
         x = x.view(-1, self.future_xform.n_obs, 2)
         x = F.softmax(x, dim=2)
@@ -81,9 +103,11 @@ class Oracle(nn.Module):
 
     def train(self, oracle_data):
 
+        consistency_check(oracle_data)
+
         s_batch = to_torch(np.array([self.state_xform.state_to_np(tr.s_i)\
                 for tr in oracle_data]))
-        f_batch = to_torch(np.array([self.future_xform.target_state_to_np(tr.s_t)\
+        f_batch = to_torch(np.array([self.future_xform.truth_to_np(tr.s_t)\
                 for tr in oracle_data]))
 
         future_prediction = self(s_batch)
