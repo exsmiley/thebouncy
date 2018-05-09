@@ -9,19 +9,11 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from dqn import *
 from zoombinis import *
 
+USE_ORACLE = True
+
 
 if __name__ == "__main__":
-    print ("ZOOMINIIIISSSSSS")
-    n_hidden = 128
-    state_xform, action_xform, future_xform = StateXform(), ActionXform(), FutureXform()
-
-    oracle = Oracle(state_xform, future_xform, n_hidden).to(device)
-    oracle_xform = OracleXform(oracle)
-
-    dqn_policy = DQN(oracle_xform, action_xform, n_hidden).to(device)
-    dqn_target = DQN(oracle_xform, action_xform, n_hidden).to(device)
-    
-
+    print ("ZOOMBINIS")
     params = {
         "BATCH_SIZE" : 128,
         "GAMMA" : 0.5 ,
@@ -32,9 +24,27 @@ if __name__ == "__main__":
         "UPDATE_PER_ROLLOUT" : 5,
         "LEARNING_RATE" : 0.001,
         "REPLAY_SIZE" : 100000 ,
-        "num_initial_episodes" : 100,
+        "num_initial_episodes" : 500,
         "num_episodes" : 100000,
         "game_bound" : 20,
         }
-    trainer = JointTrainer(params)
-    trainer.pre_train(dqn_policy, dqn_target, oracle, measure_oracle, GameEnv)
+    n_hidden = 128
+    state_xform, action_xform, future_xform = StateXform(), ActionXform(), FutureXform()
+
+    if USE_ORACLE:
+        oracle = Oracle(state_xform, future_xform, n_hidden).to(device)
+        oracle_xform = OracleXform(oracle)
+
+        dqn_policy = DQN(oracle_xform, action_xform, n_hidden).to(device)
+        dqn_target = DQN(oracle_xform, action_xform, n_hidden).to(device)
+        trainer = JointTrainer(params)
+        trainer.pre_train(dqn_policy, dqn_target, oracle, measure_oracle, GameEnv)
+        # params['num_initial_episodes'] = 100
+        # trainer = Trainer(params)
+        # trainer.train(dqn_policy, dqn_target, GameEnv)
+    else:
+        dqn_policy = DQN(state_xform, action_xform, n_hidden).to(device)
+        dqn_target = DQN(state_xform, action_xform, n_hidden).to(device)
+        trainer = Trainer(params)
+        trainer.train(dqn_policy, dqn_target, GameEnv)
+    

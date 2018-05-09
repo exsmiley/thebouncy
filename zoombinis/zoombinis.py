@@ -419,10 +419,17 @@ class Oracle(nn.Module):
         
         for i in range(0, len(vecs), NUM_BRIDGES):
             total = 0
+            max_j = 0
+            max_j_val = 0
             for j in range(i, i+NUM_BRIDGES):
-                total += vecs[j]
-            for j in range(i, i+NUM_BRIDGES):
-                vecs[j] /= total
+                # total += vecs[j]
+                if vecs[j] > max_j_val:
+                    max_j = j
+                    max_j_val = vecs[j]
+                vecs[j] = 0
+            vecs[max_j] = 1
+            # for j in range(i, i+NUM_BRIDGES):
+                # vecs[j] /= total
 
         return list(vecs)
 
