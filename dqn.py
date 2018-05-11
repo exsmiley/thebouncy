@@ -262,7 +262,7 @@ class Trainer:
             epi = self.compute_epi(i_episode) 
 
             # collect trace
-            trace = dqn_play_game(env_maker(), policy_net, self.game_bound, epi, oracle=oracle) 
+            trace = dqn_play_game(env_maker(), policy_net, self.game_bound, epi, oracle=oracle, entropy_scale_factor=self.entropy_scale_factor) 
             for tr in trace:
                 memory.push(tr)
                 # if len(memory) == memory.capacity:
