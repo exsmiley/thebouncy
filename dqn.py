@@ -19,7 +19,7 @@ Pd = namedtuple('Pd', ('s_i', 's_t'))
 
 from utils import to_torch, to_torch_int, to_torch_byte, device
 
-def dqn_play_game(env, actor, bnd, epi):
+def dqn_play_game(env, actor, bnd, epi, oracle=None, entropy_scale_factor=1.0):
     '''
     get a roll-out trace of an actor acting on an environment
     env : the environment
@@ -36,6 +36,13 @@ def dqn_play_game(env, actor, bnd, epi):
         action = actor.act(s, env.forbid(), epi)
         ss, r, done = env.step(action)
         # set a bound on the number of turns
+
+        if oracle is not None:
+            pre_entropy = oracle.get_entropy(s)
+            post_entropy = oracle.get_entropy(s)
+            delta = pre_entropy - post_entropy
+            r += delta * entropy_scale_factor
+
         i_iter += 1
         if i_iter > bnd: 
             done = True
@@ -144,6 +151,7 @@ class Trainer:
         self.num_initial_episodes = params["num_initial_episodes"]
         self.num_episodes         = params["num_episodes"]
         self.game_bound           = params["game_bound"]
+        self.entropy_scale_factor = params.get("entropy_scale_factor", 1.0)
 
     def compute_epi(self, steps_done):
         e_s = self.EPS_START
@@ -212,6 +220,49 @@ class Trainer:
 
             # collect trace
             trace = dqn_play_game(env_maker(), policy_net, self.game_bound, epi) 
+            for tr in trace:
+                memory.push(tr)
+                # if len(memory) == memory.capacity:
+                #     print ("buffer is full")
+                #     return
+
+            # perform 
+            if len(memory) > self.BATCH_SIZE * 20:
+                for j_train in range(self.UPDATE_PER_ROLLOUT):
+                    transitions = memory.sample(self.BATCH_SIZE)
+                    self.optimize_model(policy_net, target_net, transitions, optimizer)
+ 
+            # periodically bring target network up to date
+            if i_episode % self.TARGET_UPDATE == 0:
+                # print (" copying over to target network ! ! ! !")
+                target_net.load_state_dict(policy_net.state_dict())
+
+            # periodically print out some diagnostics
+            if i_episode % 100 == 0:
+                print (" ============== i t e r a t i o n ============= ", i_episode)
+                print (" episilon ", epi)
+                print (" measure ", measure_dqn(env_maker, policy_net, self.game_bound))
+                print (" replay size ", len(memory))
+
+    def train_with_oracle(self, policy_net, target_net, env_maker, oracle):
+        # policy_net = DQN().to(device)
+        # target_net = DQN().to(device)
+        target_net.load_state_dict(policy_net.state_dict())
+        target_net.eval()
+        optimizer = optim.RMSprop(policy_net.parameters(), lr = self.LEARNING_RATE)
+        memory = ReplayMemory(self.REPLAY_SIZE)
+
+        # collect a lot of initial random trace epi = 1
+        for i in range(self.num_initial_episodes):
+            trace = dqn_play_game(env_maker(), policy_net, self.game_bound, 1.0, oracle=oracle, entropy_scale_factor=self.entropy_scale_factor) 
+            for tr in trace:
+                memory.push(tr)
+
+        for i_episode in tqdm.tqdm(range(self.num_episodes)):
+            epi = self.compute_epi(i_episode) 
+
+            # collect trace
+            trace = dqn_play_game(env_maker(), policy_net, self.game_bound, epi, oracle=oracle) 
             for tr in trace:
                 memory.push(tr)
                 # if len(memory) == memory.capacity:
@@ -356,7 +407,7 @@ class JointTrainer(Trainer):
                 print (" replay size ", len(policy_memory))
                 print (" Q loss ", q_loss)
 
-    def pre_train_only(self, policy_net, target_net, oracle, measure_oracle, env_maker):
+    def oracle_train_only(self, policy_net, target_net, oracle, measure_oracle, env_maker):
         target_net.load_state_dict(policy_net.state_dict())
         target_net.eval()
         policy_optimizer = optim.RMSprop(policy_net.parameters(), lr = self.LEARNING_RATE)

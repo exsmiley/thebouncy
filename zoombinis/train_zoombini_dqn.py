@@ -9,7 +9,7 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from dqn import *
 from zoombinis import *
 
-USE_ORACLE = True
+USE_ORACLE = False
 
 
 if __name__ == "__main__":
@@ -31,20 +31,21 @@ if __name__ == "__main__":
     n_hidden = 128
     state_xform, action_xform, future_xform = StateXform(), ActionXform(), FutureXform()
 
-    if USE_ORACLE:
-        oracle = Oracle(state_xform, future_xform, n_hidden).to(device)
-        oracle_xform = OracleXform(oracle)
+    # if USE_ORACLE:
+    oracle = Oracle(state_xform, future_xform, n_hidden).to(device)
+    dqn_policy = DQN(state_xform, action_xform, n_hidden).to(device)
+    dqn_target = DQN(state_xform, action_xform, n_hidden).to(device)
+    #     oracle_xform = OracleXform(oracle)
 
-        dqn_policy = DQN(oracle_xform, action_xform, n_hidden).to(device)
-        dqn_target = DQN(oracle_xform, action_xform, n_hidden).to(device)
-        trainer = JointTrainer(params)
-        trainer.pre_train(dqn_policy, dqn_target, oracle, measure_oracle, GameEnv)
-        # params['num_initial_episodes'] = 100
-        # trainer = Trainer(params)
-        # trainer.train(dqn_policy, dqn_target, GameEnv)
-    else:
-        dqn_policy = DQN(state_xform, action_xform, n_hidden).to(device)
-        dqn_target = DQN(state_xform, action_xform, n_hidden).to(device)
-        trainer = Trainer(params)
-        trainer.train(dqn_policy, dqn_target, GameEnv)
+    #     dqn_policy = DQN(oracle_xform, action_xform, n_hidden).to(device)
+    #     dqn_target = DQN(oracle_xform, action_xform, n_hidden).to(device)
+    trainer = JointTrainer(params)
+    trainer.oracle_train_only(dqn_policy, dqn_target, oracle, measure_oracle, GameEnv)
+    #     # params['num_initial_episodes'] = 100
+    #     # trainer = Trainer(params)
+    #     # trainer.train(dqn_policy, dqn_target, GameEnv)
+    # else:
+    
+    trainer = Trainer(params)
+    trainer.train(dqn_policy, dqn_target, GameEnv)
     
