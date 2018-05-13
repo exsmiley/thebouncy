@@ -115,7 +115,7 @@ class Oracle(nn.Module):
 
         s_batch = to_torch(np.array([self.state_xform.state_to_np(tr.s_i)\
                 for tr in oracle_data]))
-        f_batch = to_torch(np.array([self.future_xform.truth_to_np(tr.s_t)\
+        f_batch = to_torch(np.array([self.future_xform.target_state_to_np(tr.s_t)\
                 for tr in oracle_data]))
 
         future_prediction = self(s_batch)

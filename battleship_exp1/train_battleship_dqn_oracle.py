@@ -16,7 +16,7 @@ if __name__ == "__main__":
     truth_xform = StateXformTruth()
     n_hidden = 128
 
-    oracle = Oracle(state_xform, truth_xform, action_xform, n_hidden).to(device)
+    oracle = Oracle(state_xform, state_xform, action_xform, n_hidden).to(device)
     oracle_xform = OracleXform(oracle)
 
     dqn_policy = DQN(oracle_xform, action_xform, n_hidden).to(device)
@@ -32,11 +32,11 @@ if __name__ == "__main__":
             "EPS_END" : 0.05,
             "EPS_DECAY" : 500,
             "TARGET_UPDATE" : 10,
-            "UPDATE_PER_ROLLOUT" : 10,
-            "LEARNING_RATE" : 0.001,
+            "UPDATE_PER_ROLLOUT" : 1,
+            "LEARNING_RATE" : 0.0001,
             "REPLAY_SIZE" : 10000 ,
             "num_initial_episodes" : 0,
-            "num_episodes" : 1001,
+            "num_episodes" : 2001,
             "game_bound" : L*L*0.5,
             }
 
