@@ -14,16 +14,13 @@ if __name__ == "__main__":
     print ("HEYA")
     state_xform, action_xform = StateXform(), ActionXform()
     truth_xform = StateXformTruth()
-    n_hidden = 1000
+    n_hidden = 100
 
     oracle = Oracle(state_xform, truth_xform, action_xform, n_hidden).to(device)
     oracle_xform = OracleXform(oracle)
 
-    dqn_policy = DQN(state_xform, action_xform, n_hidden).to(device)
-    dqn_target = DQN(state_xform, action_xform, n_hidden).to(device)
-
-    # dqn_policy = DQN(oracle_xform, action_xform, n_hidden).to(device)
-    # dqn_target = DQN(oracle_xform, action_xform, n_hidden).to(device)
+    dqn_policy = DQN(oracle_xform, action_xform, n_hidden).to(device)
+    dqn_target = DQN(oracle_xform, action_xform, n_hidden).to(device)
 
     # dqn_policy = DQN(truth_xform, action_xform, n_hidden).to(device)
     # dqn_target = DQN(truth_xform, action_xform, n_hidden).to(device)
@@ -38,10 +35,11 @@ if __name__ == "__main__":
             "UPDATE_PER_ROLLOUT" : 10,
             "LEARNING_RATE" : 0.001,
             "REPLAY_SIZE" : 200000 ,
-            "num_initial_episodes" : 5000,
-            "num_episodes" : 5000,
+            "num_initial_episodes" : 0,
+            "num_episodes" : 1001,
             "game_bound" : L*L*0.75,
             }
 
     trainer = JointTrainer(params)
-    trainer.oracle_only(oracle, measure_oracle, GameEnv)
+    # trainer.oracle_only(oracle, measure_oracle, GameEnv)
+    trainer.joint_train(dqn_policy, dqn_target, oracle, measure_oracle, GameEnv)

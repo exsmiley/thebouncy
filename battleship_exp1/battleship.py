@@ -9,7 +9,7 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from utils import *
 
 # length of board
-L = 10
+L = 10 # score of 22
 boat_shapes = [(2,4), (1,5), (1,3), (1,3), (1,3)]
 
 # L = 8 # score of 19 max
@@ -117,7 +117,7 @@ class GameEnv(object):
     # return 1.0
     # if (x,y) in self.made_moves:
     #   return -1.0
-    return -0.1
+    return 0.0
 
   # def get_final_reward(self):
   #   return len(self.occupied.intersection(self.made_moves))
@@ -188,10 +188,10 @@ class OracleXform:
     return ret
 
   def harden(self, a_pred):
-    if a_pred[0] > a_pred[1] + 0.6:
-      return np.array([0.0, 1.0])
-    if a_pred[1] > a_pred[0] + 0.6:
+    if a_pred[0] > a_pred[1]:
       return np.array([1.0, 0.0])
+    if a_pred[1] >= a_pred[0]:
+      return np.array([0.0, 1.0])
     return np.array([0.0, 0.0])
   def state_to_np(self, state):
     board_mask, board_truth = state
@@ -202,7 +202,7 @@ class OracleXform:
         if np.sum(board[i]) > 0:
             ret.append(np.concatenate((board[i], np.array([1.0]))))
         else:
-            ret.append(np.concatenate((oracle_prediction[i], 
+            ret.append(np.concatenate((oracle_prediction[i],
                                        np.array([0.0]))))
     ret = np.array(ret)
     ret = np.resize(ret, L*L*3)
@@ -227,3 +227,21 @@ class ActionXform:
     ret[a] = 1.0
     return ret
 
+class CompressXform:
+  def __init__(self, oracle):
+    self.length = L*L*2 + 40
+    self.oracle = oracle
+  def board_to_np(self, state):
+    ret = np.zeros(shape=(L*L,2), dtype=np.float32)
+    ret_idx = np.resize(state, L*L)
+    for i in range(L*L):
+      if int(ret_idx[i]) != 2:
+        ret[i, int(ret_idx[i])] = 1.0
+    return ret
+
+  def state_to_np(self, state):
+    board_mask, board_truth = state
+    board = self.board_to_np(board_mask)
+    compressed_repr = self.oracle.compress(board_mask)
+    board = np.resize(board, L*L*2)
+    return np.concatenate((board, compressed_repr))

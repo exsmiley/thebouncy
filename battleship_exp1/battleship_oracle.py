@@ -55,7 +55,6 @@ def measure_oracle(oracle, oracle_datas):
         error = np.abs(pred - truth_i)
         # print ("error " )
         error = np.sum(error)
-        # print (error)
 
         total_err += error
     return total_err / len(oracle_datas) / (L * L)
@@ -92,9 +91,17 @@ class Oracle(nn.Module):
         prediction = self(state).data.cpu().numpy()[0]
         return prediction
 
+    def compress(self, state):
+        x = to_torch(np.array([self.state_xform.state_to_np(state)]))
+        x = F.relu(self.enc1(x))
+        x = F.relu(self.enc2(x))
+        compressed = x.data.cpu().numpy()[0]
+        return compressed
+
     def forward(self, x):
         batch_size = x.size()[0]
-        x = self.enc2(self.enc1(x))
+        x = F.relu(self.enc1(x))
+        x = F.relu(self.enc2(x))
         x = self.head(x)
         x = x.view(-1, self.future_xform.n_obs, 2)
         x = F.softmax(x, dim=2)
@@ -154,7 +161,8 @@ class Oracle(nn.Module):
 
     def act(self, x, forbid, epi):
         max_id, max_pr = self.best_not_forbid(x, forbid)
-        if max_pr > 0.7:
+        #     return self.max_pr(x, forbid, epi)
+        if max_pr > 0.51:
             return self.max_pr(x, forbid, epi)
         else:
             return self.max_ent(x, forbid, epi)

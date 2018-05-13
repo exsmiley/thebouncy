@@ -14,10 +14,17 @@ if __name__ == "__main__":
     print ("HEYA")
     state_xform, action_xform = StateXform(), ActionXform()
     truth_xform = StateXformTruth()
+    oracle_n_hidden = 40
     n_hidden = 100
 
-    dqn_policy = DQN(state_xform, action_xform, n_hidden).to(device)
-    dqn_target = DQN(state_xform, action_xform, n_hidden).to(device)
+    oracle = Oracle(state_xform, truth_xform, action_xform, oracle_n_hidden).to(device)
+    compress_xform = CompressXform(oracle)
+
+    dqn_policy = DQN(compress_xform, action_xform, n_hidden).to(device)
+    dqn_target = DQN(compress_xform, action_xform, n_hidden).to(device)
+
+    # dqn_policy = DQN(truth_xform, action_xform, n_hidden).to(device)
+    # dqn_target = DQN(truth_xform, action_xform, n_hidden).to(device)
 
     params = {
             "BATCH_SIZE" : 128,
@@ -35,4 +42,5 @@ if __name__ == "__main__":
             }
 
     trainer = JointTrainer(params)
-    trainer.policy_only(dqn_policy, dqn_target, GameEnv)
+    # trainer.oracle_only(oracle, measure_oracle, GameEnv)
+    trainer.joint_train(dqn_policy, dqn_target, oracle, measure_oracle, GameEnv)

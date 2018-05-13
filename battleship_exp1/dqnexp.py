@@ -59,12 +59,12 @@ def measure_dqn(env_class, agent, bnd):
         env = env_class()
         trace = dqn_play_game(env, agent, bnd, 0.0)
         score += sum([tr.r for tr in trace])
-    print ("a trace in measure ")
-    print ([tr.a for tr in trace])
-    for tr in trace:
-        print ("-----------------")
-        print (tr.s[0])
-        print (tr.a)
+    # print ("a trace in measure ")
+    # print ([tr.a for tr in trace])
+    # for tr in trace:
+    #     print ("-----------------")
+    #     print (tr.s[0])
+    #     print (tr.a)
     return score / 100
 
 class ReplayMemory(object):
@@ -102,7 +102,8 @@ class DQN(nn.Module):
 
     def forward(self, x):
         batch_size = x.size()[0]
-        x = self.enc2(self.enc1(x))
+        x = F.relu(self.enc1(x))
+        x = F.relu(self.enc2(x))
         return self.head(x)
 
     def get_Q(self, x):
@@ -241,13 +242,27 @@ class JointTrainer(Trainer):
         super(JointTrainer, self).__init__(params)
         
     def joint_train(self, policy_net, target_net, oracle, measure_oracle, env_maker):
-        # policy_net = DQN().to(device)
-        # target_net = DQN().to(device)
+        q_loss = None
         target_net.load_state_dict(policy_net.state_dict())
         target_net.eval()
         policy_optimizer = optim.RMSprop(policy_net.parameters(), lr = self.LEARNING_RATE)
         policy_memory = ReplayMemory(self.REPLAY_SIZE)
         oracle_memory = ReplayMemory(self.REPLAY_SIZE)
+
+        print ("pretraining oracle . . . ")
+        for _ in tqdm.tqdm(range(self.num_initial_episodes)):
+            trace = dqn_play_game(env_maker(), oracle, self.game_bound, 1.0)
+            # compute oracle training data from trace and collect
+            oracle_data = get_oracle_training_data(trace)
+            for o_data in oracle_data:
+                oracle_memory.push(o_data)
+            # perform optimization
+            if len(oracle_memory) > self.BATCH_SIZE * 20:
+                for j_train in range(self.UPDATE_PER_ROLLOUT):
+                    # optimize the oracle
+                    oracle_datas = oracle_memory.sample(self.BATCH_SIZE)
+                    oracle.train(oracle_datas)
+
 
         for i_episode in tqdm.tqdm(range(self.num_episodes)):
             epi = self.compute_epi(i_episode) 
@@ -256,9 +271,7 @@ class JointTrainer(Trainer):
             trace = dqn_play_game(env_maker(), policy_net, self.game_bound, epi) 
             for tr in trace:
                 policy_memory.push(tr)
-                if len(policy_memory) == policy_memory.capacity:
-                    print ("buffer is full")
-                    return
+
             # compute oracle training data from trace and collect
             oracle_data = get_oracle_training_data(trace)
             for o_data in oracle_data:
@@ -284,10 +297,9 @@ class JointTrainer(Trainer):
                 print (" ============== i t e r a t i o n ============= ", i_episode)
                 print (" episilon ", epi)
                 print (" measure ", measure_dqn(env_maker, policy_net, self.game_bound))
-                if len(oracle_memory) > self.BATCH_SIZE:
-                    oracle_datas = oracle_memory.sample(self.BATCH_SIZE)
-                    print (" measure oracle", measure_oracle(oracle, oracle_datas))
-                print (" replay size ", len(policy_memory))
+                trace = dqn_play_game(env_maker(), oracle, self.game_bound, 0.0) 
+                print (" oracle measure ", 
+                        measure_oracle(oracle, [tr.s for tr in trace]))
 
 
     def policy_only(self, policy_net, target_net, env_maker):
@@ -321,14 +333,14 @@ class JointTrainer(Trainer):
             if i_episode % 100 == 0:
                 print (" ============== i t e r a t i o n ============= ", i_episode)
                 print (" episilon ", epi)
-                print (" - - - - - - - - - - - measure ", measure_dqn(env_maker, policy_net, self.game_bound))
+                print (" measure ", measure_dqn(env_maker, policy_net, self.game_bound))
 
 
     def oracle_only(self, oracle, measure_oracle, env_maker):
         oracle_memory = ReplayMemory(self.REPLAY_SIZE)
 
         print ("pretraining oracle . . . ")
-        for _ in tqdm.tqdm(range(self.num_initial_episodes)):
+        for _ in tqdm.tqdm(range(self.num_episodes)):
             epi = self.compute_epi(_)
             # pretrain oracle
             trace = dqn_play_game(env_maker(), oracle, self.game_bound, epi)
