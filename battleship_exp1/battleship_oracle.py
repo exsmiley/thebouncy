@@ -81,7 +81,7 @@ class Oracle(nn.Module):
         self.action_xform = action_xform
 
         self.enc1  = nn.Linear(state_length, n_hidden)
-        self.enc2  = nn.Linear(n_hidden, n_hidden)
+        # self.enc2  = nn.Linear(n_hidden, n_hidden)
         self.head = nn.Linear(n_hidden, future_length)
 
         self.all_opt = torch.optim.RMSprop(self.parameters(), lr=0.0001)
@@ -94,14 +94,14 @@ class Oracle(nn.Module):
     def compress(self, state):
         x = to_torch(np.array([self.state_xform.state_to_np(state)]))
         x = F.relu(self.enc1(x))
-        x = F.relu(self.enc2(x))
+        # x = F.relu(self.enc2(x))
         compressed = x.data.cpu().numpy()[0]
         return compressed
 
     def forward(self, x):
         batch_size = x.size()[0]
         x = F.relu(self.enc1(x))
-        x = F.relu(self.enc2(x))
+        # x = F.relu(self.enc2(x))
         x = self.head(x)
         x = x.view(-1, self.future_xform.n_obs, 2)
         x = F.softmax(x, dim=2)

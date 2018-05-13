@@ -96,14 +96,14 @@ class DQN(nn.Module):
 
         self.enc1  = nn.Linear(state_length, n_hidden)
         # self.bn1 = nn.BatchNorm1d(n_hidden)
-        self.enc2  = nn.Linear(n_hidden, n_hidden)
+        # self.enc2  = nn.Linear(n_hidden, n_hidden)
         # self.bn2 = nn.BatchNorm1d(n_hidden)
         self.head = nn.Linear(n_hidden, action_length)
 
     def forward(self, x):
         batch_size = x.size()[0]
         x = F.relu(self.enc1(x))
-        x = F.relu(self.enc2(x))
+        # x = F.relu(self.enc2(x))
         return self.head(x)
 
     def get_Q(self, x):
