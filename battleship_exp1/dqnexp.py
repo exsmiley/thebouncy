@@ -225,7 +225,6 @@ class Trainer:
  
             # periodically bring target network up to date
             if i_episode % self.TARGET_UPDATE == 0:
-                # print (" copying over to target network ! ! ! !")
                 target_net.load_state_dict(policy_net.state_dict())
 
             # periodically print out some diagnostics
@@ -289,7 +288,6 @@ class JointTrainer(Trainer):
  
             # periodically bring target network up to date
             if i_episode % self.TARGET_UPDATE == 0:
-                print (" copying over to target network ! ! ! !")
                 target_net.load_state_dict(policy_net.state_dict())
 
             # periodically print out some diagnostics
@@ -326,7 +324,6 @@ class JointTrainer(Trainer):
  
             # periodically bring target network up to date
             if i_episode % self.TARGET_UPDATE == 0:
-                print (" copying over to target network ! ! ! !")
                 target_net.load_state_dict(policy_net.state_dict())
 
             # periodically print out some diagnostics

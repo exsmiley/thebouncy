@@ -10,7 +10,7 @@ from utils import *
 
 # length of board
 L = 10 # score of 22
-boat_shapes = [(2,4), (1,5), (1,3), (1,3), (1,3)]
+boat_shapes = [(2,4), (1,5), (1,5), (1,4)]
 
 # L = 8 # score of 19 max
 # boat_shapes = [(2,4), (1,5), (1,3), (1,3)]
