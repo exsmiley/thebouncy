@@ -31,7 +31,7 @@ if __name__ == "__main__":
             "REPLAY_SIZE" : 200000 ,
             "num_initial_episodes" : 0,
             "num_episodes" : 1001,
-            "game_bound" : L*L*0.75,
+            "game_bound" : L*L*0.5,
             }
 
     trainer = JointTrainer(params)
