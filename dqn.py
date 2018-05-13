@@ -111,7 +111,8 @@ class DQN(nn.Module):
 
     def forward(self, x):
         batch_size = x.size()[0]
-        x = self.enc2(self.enc1(x))
+        x = F.relu(self.enc1(x))
+        x = F.relu(self.enc2(x))
         return self.head(x)
 
     def get_Q(self, x):
