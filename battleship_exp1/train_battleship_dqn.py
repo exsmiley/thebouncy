@@ -14,7 +14,7 @@ if __name__ == "__main__":
     print ("HEYA")
     state_xform, action_xform = StateXform(), ActionXform()
     truth_xform = StateXformTruth()
-    n_hidden = 100
+    n_hidden = 128
 
     dqn_policy = DQN(state_xform, action_xform, n_hidden).to(device)
     dqn_target = DQN(state_xform, action_xform, n_hidden).to(device)

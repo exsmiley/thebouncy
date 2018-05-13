@@ -14,7 +14,7 @@ if __name__ == "__main__":
     print ("HEYA")
     state_xform, action_xform = StateXform(), ActionXform()
     truth_xform = StateXformTruth()
-    n_hidden = 100
+    n_hidden = 128
 
     oracle = Oracle(state_xform, truth_xform, action_xform, n_hidden).to(device)
     oracle_xform = OracleXform(oracle)
