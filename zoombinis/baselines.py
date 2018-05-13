@@ -145,6 +145,40 @@ class MaxEntropyPlayer(object):
         return states, game
 
 
+    def act(self, state, made_actions, epi=None):
+        indices_remaining = [i for i in range(NUM_BRIDGES*NUM_ZOOMBINIS) if not i in made_actions]
+        best_entropy = -1
+        best_entropy_i = -1
+        best_prob = -1
+        best_prob_i = -1
+        state = state[0]
+
+        # state = game.get_brain_state()
+        entropies = self.brain.get_entropies(state)
+        probs = self.brain.get_probabilities(state)
+
+        for i in indices_remaining:
+            
+            entropy = entropies[i]
+            prob = probs[i]
+
+            if entropy > best_entropy:
+                best_entropy_i = i
+                best_entropy = entropy
+
+            if prob > best_prob:
+                best_prob_i = i
+                best_prob = prob
+
+
+        if best_prob > self.prob_value:
+            index = best_prob_i
+        else:
+            index = best_entropy_i
+
+        return index
+
+
     def play(self, game):
         actual_score = 0
         running_scores = []

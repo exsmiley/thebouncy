@@ -318,7 +318,7 @@ class GameEnv(object):
         self.game = game if game else Game()
         self.actions = set()
         self.truth = self.game.get_brain_truth()
-        return np.array(self.game.get_brain_state()), self.truth, self.game.get_mask_truth()
+        return np.array(self.game.get_brain_state()), self.truth, self.game.get_mask_truth(), self.actions
 
     def win(self):
         return self.game.has_won()
@@ -338,19 +338,22 @@ class GameEnv(object):
         reward = 1 if passed else 0
         done = not self.game.can_move()
 
-        state = state, self.truth, self.game.get_mask_truth()
+        state = state, self.truth, self.game.get_mask_truth(), self.actions
 
         return state, reward, done
 
     def forbid(self):
-        return self.game.get_invalid_moves()
+        return self.get_invalid_moves()
+        # for move in self.game.get_invalid_moves():
+            # self.actions.add(move)
+        # return self.actions
 
 class StateXform:
   def __init__(self):
     self.length = BRAIN_INPUT_LENGTH
 
   def state_to_np(self, state):
-    board_mask, _, _ = state
+    board_mask, _, _, _ = state
     # ret =  np.concatenate((board_mask, mask_truth))
     return np.array(board_mask)
 
@@ -359,19 +362,20 @@ class StateXformTruth:
     self.length = BRAIN_INPUT_LENGTH + OUTPUT_LENGTH
 
   def state_to_np(self, state):
-    board_mask, board_truth, _ = state
+    board_mask, board_truth, _, _ = state
     ret =  np.concatenate((board_mask, board_truth))
     return ret
 
 class OracleXform:
     def __init__(self, oracle):
-        self.length = BRAIN_INPUT_LENGTH + OUTPUT_LENGTH
+        self.length = OUTPUT_LENGTH + OUTPUT_LENGTH
         self.oracle = oracle
 
     def state_to_np(self, state):
-        board_mask, _, _ = state
+        board_mask, _, _, actions = state
+        actions_vec = [1 if i in actions else 0 for i in range(OUTPUT_LENGTH)]
         oracle_prediction = self.oracle.predict(state)
-        ret =  np.concatenate((board_mask, oracle_prediction))
+        ret =  np.concatenate((actions_vec, oracle_prediction))
 
         return ret
 
@@ -413,23 +417,17 @@ class Oracle(nn.Module):
         self.optimizer = optim.Adam(self.parameters(), lr=1e-3)
 
     def predict(self, state):
-        state, _, _ = state
+        state, _, _, _ = state
         state = Variable(torch.FloatTensor(state).to(device).view(-1, BRAIN_INPUT_LENGTH))
         vecs = self.forward(state).cpu().data.numpy()[0]
         
+        # turn into probabilities
         for i in range(0, len(vecs), NUM_BRIDGES):
             total = 0
-            max_j = 0
-            max_j_val = 0
             for j in range(i, i+NUM_BRIDGES):
-                # total += vecs[j]
-                if vecs[j] > max_j_val:
-                    max_j = j
-                    max_j_val = vecs[j]
-                vecs[j] = 0
-            vecs[max_j] = 1
-            # for j in range(i, i+NUM_BRIDGES):
-                # vecs[j] /= total
+                total += vecs[j]
+            for j in range(i, i+NUM_BRIDGES):
+                vecs[j] /= total
 
         return list(vecs)
 
@@ -437,6 +435,14 @@ class Oracle(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
         return F.sigmoid(x)
+
+    def get_entropy(self, state):
+        predicted = self.predict(state)
+        # print(predicted)
+        ent = sum([-p*np.log(p) for p in predicted if p > 0])
+        # print(ent)
+        # print()
+        return ent
 
     def train(self, oracle_data):
         s_batch = to_torch(np.array([self.state_xform.state_to_np(tr.s_i)\
@@ -452,6 +458,14 @@ class Oracle(nn.Module):
         loss = self.criterion(future_prediction, f_batch)
         loss.backward()
         self.optimizer.step()
+
+    def load(self, name='models/oracle'):
+        self.load_state_dict(torch.load(name))
+        print('Loaded model from {}!'.format(name))
+
+    def save(self, name='models/oracle'):
+        torch.save(self.state_dict(), name)
+        print('Saved model to {}!'.format(name))
 
 def measure_oracle(oracle, oracle_datas):
     total_score = 0

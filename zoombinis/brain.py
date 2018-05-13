@@ -11,7 +11,7 @@ from torch.autograd import Variable
 
 
 # tunable hyperparameters
-NUM_RUNS = 10000
+NUM_RUNS = 50000
 SAMPLE_SIZE = 20
 LEARNING_RATE = 1e-3
 MOMENTUM = 0.9
@@ -29,8 +29,8 @@ class Brain(nn.Module):
     def __init__(self, chkpt=None, ):
         super(Brain, self).__init__()
 
-        self.fc1 = nn.Linear(BRAIN_INPUT_LENGTH, 128)
-        self.fc2 = nn.Linear(128, OUTPUT_LENGTH)
+        self.fc1 = nn.Linear(BRAIN_INPUT_LENGTH, 1000)
+        self.fc2 = nn.Linear(1000, OUTPUT_LENGTH)
 
         if chkpt is not None:
             self.load(chkpt)
@@ -112,8 +112,8 @@ class Brain(nn.Module):
         torch.save(self.state_dict(), name)
         print('Saved model to {}!'.format(name))
 
-    def train(self, traces):
-        pass
+    # def train(self, traces):
+    #     pass
 
 
 class BrainTrainer(object):
@@ -160,7 +160,7 @@ class BrainTrainer(object):
         loss.backward()
         self.optimizer.step()
 
-        print('Loss:', sum(loss.data.numpy()))
+        print('Loss:', loss.data.numpy())
 
         # reset buffers
         self.state_buffer = []

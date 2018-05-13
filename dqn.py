@@ -431,37 +431,6 @@ class JointTrainer(Trainer):
                     oracle_datas = oracle_memory.sample(self.BATCH_SIZE)
                     oracle.train(oracle_datas)
 
-        # for i_episode in tqdm.tqdm(range(self.num_episodes)):
-        #     epi = self.compute_epi(i_episode) 
-
-        #     # collect trace
-        #     trace = dqn_play_game(env_maker(), policy_net, self.game_bound, epi) 
-        #     for tr in trace:
-        #         policy_memory.push(tr)
-        #         if len(policy_memory) == policy_memory.capacity:
-        #             print ("buffer is full")
-        #             return
-
-        #     # perform optimization
-        #     if len(policy_memory) > self.BATCH_SIZE * 20:
-        #         for j_train in range(self.UPDATE_PER_ROLLOUT):
-        #             # optimize the policy network
-        #             transitions = policy_memory.sample(self.BATCH_SIZE)
-        #             q_loss = self.optimize_model(policy_net, target_net, transitions, policy_optimizer)
- 
-        #     # periodically bring target network up to date
-        #     if i_episode % self.TARGET_UPDATE == 0:
-        #         print (" copying over to target network ! ! ! !")
-        #         target_net.load_state_dict(policy_net.state_dict())
-
-        #     # periodically print out some diagnostics
-        #     if i_episode % 100 == 0:
-        #         print (" ============== i t e r a t i o n ============= ", i_episode)
-        #         print (" episilon ", epi)
-        #         print (" - - - - - - - - - - - measure ", measure_dqn(env_maker, policy_net, self.game_bound))
-        #         print (" replay size ", len(policy_memory))
-        #         print (" Q loss ", q_loss)
-
         oracle_datas = oracle_memory.sample(self.BATCH_SIZE)
         print (" - - - - - - - - - - measure oracle", measure_oracle(oracle, oracle_datas))
 
