@@ -14,24 +14,25 @@ if __name__ == "__main__":
     print ("HEYA")
     state_xform, action_xform = StateXform(), ActionXform()
     truth_xform = StateXformTruth()
-    n_hidden = 128
+    n_hidden = 256
 
     dqn_policy = DQN(state_xform, action_xform, n_hidden).to(device)
     dqn_target = DQN(state_xform, action_xform, n_hidden).to(device)
 
     params = {
             "BATCH_SIZE" : 50,
-            "GAMMA" : 0.9 ,
+            "GAMMA" : 0.5 ,
             "EPS_START" : 0.9,
             "EPS_END" : 0.05,
-            "EPS_DECAY" : 500,
-            "TARGET_UPDATE" : 10 ,
+            "EPS_DECAY" : 1000,
+            "TARGET_UPDATE" : 20,
             "UPDATE_PER_ROLLOUT" : 1,
             "LEARNING_RATE" : 0.0001,
-            "REPLAY_SIZE" : 10000 ,
+            "REPLAY_SIZE" : 100000 ,
             "num_initial_episodes" : 0,
-            "num_episodes" : 2001,
+            "num_episodes" : 10001,
             "game_bound" : L*L*0.5,
+
             }
 
     trainer = JointTrainer(params)
