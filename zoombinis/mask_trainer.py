@@ -65,7 +65,7 @@ class MaskBrainTrainer(object):
         loss.backward()
         self.optimizer.step()
 
-        print('Loss:', sum(loss.data.numpy()))
+        print('Loss:', loss.data.numpy())
 
         # reset buffers
         self.state_buffer = []

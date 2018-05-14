@@ -1,12 +1,17 @@
 from zoombinis import *
 from baselines import *
 from actor import *
+from two_button import TwoButtonPlayer
 import tqdm
 
 
 num_games = 1000
 
-players = [ActorPipelinePlayer(), MaxProbabilityPlayer(), ActorPlayer(), WinningBridgePlayer(), WinningBridgePlayerNoHack()]
+mask_brain = Brain()
+mask_brain.load('models/brain_mask')
+max2 = MaxProbabilityPlayer()
+max2.brain = mask_brain
+players = [MaxProbabilityPlayer(), max2]
 # players = [MaxProbabilityPlayer(), MaxEntropyPlayer(), ActorPlayer(), ActorShapedPlayer(), ActorPipelinePlayer(), ActorPipelinePlayer2(), RandomFlipFlop(), RandomPlayer()]
 wins = [0 for i in range(len(players))]
 entropy_scores = [[] for i in range(len(players))]
