@@ -9,6 +9,7 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from dqnexp import *
 from battleship import *
 from battleship_oracle import *
+import pickle
 
 if __name__ == "__main__":
     print ("HEYA")
@@ -29,11 +30,13 @@ if __name__ == "__main__":
             "UPDATE_PER_ROLLOUT" : 1,
             "LEARNING_RATE" : 0.0001,
             "REPLAY_SIZE" : 100000 ,
-            "num_initial_episodes" : 0,
+            "num_oracle_episodes" : 0,
             "num_episodes" : 10001,
             "game_bound" : L*L*0.5,
 
             }
 
+    _, train_envs, test_envs = pickle.load( open( "games.p", "rb" ) )
     trainer = JointTrainer(params)
-    trainer.policy_only(dqn_policy, dqn_target, GameEnv)
+    result = trainer.policy_only(dqn_policy, dqn_target, train_envs, test_envs)
+    print (result)

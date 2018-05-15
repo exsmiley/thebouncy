@@ -160,6 +160,7 @@ class Oracle(nn.Module):
                 return self.action_xform.idx_to_action(action_id)
 
     def act(self, x, forbid, epi):
+        if random.random() < epi: return random.choice(self.action_xform.possible_actions)
         max_id, max_pr = self.best_not_forbid(x, forbid)
         #     return self.max_pr(x, forbid, epi)
         if max_pr > 0.51:
